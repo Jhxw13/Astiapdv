@@ -24,6 +24,7 @@ import {
 import { authAPI, configAPI, sistemaAPI, ecommerceAPI } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { isOwnerAdmin, isRestrictedStoreAdmin, OWNER_ADMIN_EMAIL } from "@/lib/admin-access";
 
 // ── Helpers ───────────────────────────────────────────────────
 const cargoBadge = (c: string) =>
@@ -71,6 +72,9 @@ function CertificadoStatus({ info }: { info?: any }) {
 const Configuracoes = () => {
   const { usuario } = useAuth();
   const isAdmin = usuario?.cargo === 'admin';
+  const isOwner = isOwnerAdmin(usuario);
+  const isRestrictedAdmin = isRestrictedStoreAdmin(usuario);
+  const canAccessStoreFiscal = isOwner || isRestrictedAdmin;
   const isGerente = usuario?.cargo === 'gerente' || isAdmin;
   const { toast } = useToast();
 
@@ -228,29 +232,29 @@ const Configuracoes = () => {
 
         <Tabs defaultValue="loja">
           <TabsList className="flex-wrap h-auto gap-1">
-            {isAdmin && <TabsTrigger value="loja" className="flex items-center gap-1">
+            {canAccessStoreFiscal && <TabsTrigger value="loja" className="flex items-center gap-1">
               <Building2 className="w-4 h-4" />Dados da Loja
             </TabsTrigger>}
-            {isAdmin && <TabsTrigger value="fiscal" className="flex items-center gap-1">
+            {canAccessStoreFiscal && <TabsTrigger value="fiscal" className="flex items-center gap-1">
               <FileKey2 className="w-4 h-4" />Fiscal / NF-e
             </TabsTrigger>}
             <TabsTrigger value="usuarios" className="flex items-center gap-1">
               <Users className="w-4 h-4" />Usuários
             </TabsTrigger>
-            <TabsTrigger value="rede" className="flex items-center gap-1">
+            {!isRestrictedAdmin && <TabsTrigger value="rede" className="flex items-center gap-1">
               <Wifi className="w-4 h-4" />Rede
-            </TabsTrigger>
-            {isAdmin && (
+            </TabsTrigger>}
+            {isOwner && (
               <TabsTrigger value="banco" className="flex items-center gap-1">
                 <Server className="w-4 h-4" />Banco de Dados
               </TabsTrigger>
             )}
-            {isAdmin && (
+            {isOwner && (
               <TabsTrigger value="loja_online" className="flex items-center gap-1">
                 <Globe className="w-4 h-4" />Loja Online
               </TabsTrigger>
             )}
-            {isAdmin && (
+            {isOwner && (
               <TabsTrigger value="gptmaker" className="flex items-center gap-1">
                 <Bot className="w-4 h-4" />IA / WhatsApp
               </TabsTrigger>
@@ -258,7 +262,7 @@ const Configuracoes = () => {
           </TabsList>
 
           {/* ═══════════════════════════════ ABA LOJA ═══════════════════════════════ */}
-          {isAdmin && <TabsContent value="loja" className="mt-4">
+          {canAccessStoreFiscal && <TabsContent value="loja" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -402,7 +406,7 @@ const Configuracoes = () => {
           </TabsContent>}
 
           {/* ═══════════════════════════ ABA FISCAL / NF-e ═══════════════════════════ */}
-          {isAdmin && <TabsContent value="fiscal" className="mt-4 space-y-4">
+          {canAccessStoreFiscal && <TabsContent value="fiscal" className="mt-4 space-y-4">
 
             {/* Aviso de ambiente */}
             {configLoja.ambiente_nfe === "producao" ? (
@@ -743,7 +747,7 @@ const Configuracoes = () => {
                           <Select value={userForm.cargo} onValueChange={v => setUserForm({ ...userForm, cargo: v })}>
                             <SelectTrigger><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {isAdmin && <SelectItem value="admin">Administrador (acesso total)</SelectItem>}
+                              {isOwner && <SelectItem value="admin">Administrador (acesso total)</SelectItem>}
                               <SelectItem value="gerente">Gerente (sem configurações)</SelectItem>
                               <SelectItem value="vendedor">Vendedor (PDV + clientes)</SelectItem>
                               <SelectItem value="caixa">Caixa (apenas PDV)</SelectItem>
@@ -773,13 +777,17 @@ const Configuracoes = () => {
                   <TableBody>
                     {usuarios.map(u => {
                       const [variant, label] = cargoBadge(u.cargo);
+                      const isOwnerRow = String(u.email || "").toLowerCase() === OWNER_ADMIN_EMAIL.toLowerCase();
+                      const displayNome = isOwnerRow ? "*******" : u.nome;
+                      const displayEmail = isOwnerRow ? "*******" : u.email;
                       return (
                         <TableRow key={u.id}>
                           <TableCell className="font-medium flex items-center gap-2">
                             {usuario?.id === u.id && <Shield className="w-4 h-4 text-primary" title="Você" />}
-                            {u.nome}
+                            {isOwnerRow && <Lock className="w-4 h-4 text-amber-500" title="Conta proprietária protegida" />}
+                            {displayNome}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                          <TableCell className="text-muted-foreground">{displayEmail}</TableCell>
                           <TableCell><Badge variant={variant}>{label}</Badge></TableCell>
                           <TableCell>
                             <Badge variant={u.ativo ? "default" : "secondary"}>
@@ -795,7 +803,7 @@ const Configuracoes = () => {
                               }}>
                                 <Edit className="w-3 h-3" />
                               </Button>
-                              {usuario?.id !== u.id && (
+                              {usuario?.id !== u.id && !isOwnerRow && (
                                 <Button
                                   variant="outline" size="sm"
                                   onClick={() => toggleAtivo(u)}
@@ -816,7 +824,7 @@ const Configuracoes = () => {
           </TabsContent>
 
           {/* ═══════════════════════════ ABA REDE ════════════════════════════════════ */}
-          <TabsContent value="rede" className="mt-4">
+          {!isRestrictedAdmin && <TabsContent value="rede" className="mt-4">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2"><Wifi className="w-5 h-5" />Rede Local</CardTitle>
@@ -902,11 +910,10 @@ const Configuracoes = () => {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
+          </TabsContent>}
 
           {/* ═══════════════════════════ ABA BANCO DE DADOS ══════════════════════════ */}
-          {isAdmin && (
-            <TabsContent value="banco" className="mt-4">
+          {isOwner && <TabsContent value="banco" className="mt-4">
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -936,12 +943,10 @@ const Configuracoes = () => {
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          )}
+          </TabsContent>}
 
           {/* ═══════════════════════ ABA LOJA ONLINE ═══════════════════════ */}
-          {isAdmin && (
-            <TabsContent value="loja_online" className="mt-4 space-y-4">
+          {isOwner && <TabsContent value="loja_online" className="mt-4 space-y-4">
 
               {/* Toggle principal — habilitar/desabilitar e-commerce */}
               <Card className={configLoja.ecommerce_ativo || configLoja.ecommerce_agendamento
@@ -1229,15 +1234,12 @@ const Configuracoes = () => {
                   {loading ? "Salvando..." : "Salvar Configurações"}
                 </Button>
               </div>
-            </TabsContent>
-          )}
+          </TabsContent>}
 
           {/* ══════════════════════ ABA GPT MAKER / IA WHATSAPP ══════════════════════ */}
-          {isAdmin && (
-            <TabsContent value="gptmaker" className="mt-4">
+          {isOwner && <TabsContent value="gptmaker" className="mt-4">
               <GptMakerTab configLoja={configLoja} />
-            </TabsContent>
-          )}
+          </TabsContent>}
         </Tabs>
       </div>
     </Layout>
@@ -1650,3 +1652,5 @@ Quando perguntarem sobre produtos, preços, vendas ou estoque, consulte a API an
 }
 
 export default Configuracoes;
+
+

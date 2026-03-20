@@ -118,12 +118,21 @@ export default function Financeiro() {
   };
 
   const baixarConta = async (id: number) => {
-    const forma = prompt("Forma de pagamento (dinheiro/pix/credito/debito):");
+    const forma = prompt("Forma de pagamento (dinheiro/pix/credito/debito):", "dinheiro");
     if (!forma) return;
     const valorStr = prompt("Valor pago:");
     if (!valorStr) return;
     try {
-      await financeiroAPI.baixar(id, parseFloat(valorStr), forma, new Date().toISOString().split("T")[0]);
+      const valorNormalizado = Number(
+        String(valorStr)
+          .replace(/[^\d,.-]/g, "")
+          .replace(",", ".")
+      );
+      if (!Number.isFinite(valorNormalizado) || valorNormalizado <= 0) {
+        toast({ title: "Valor inválido", description: "Digite um valor numérico maior que zero.", variant: "destructive" });
+        return;
+      }
+      await financeiroAPI.baixar(id, valorNormalizado, forma.trim().toLowerCase(), new Date().toISOString().split("T")[0]);
       toast({ title: "Baixa realizada!" }); fetchMovs();
     } catch (e: any) { toast({ title: "Erro", description: e.message, variant: "destructive" }); }
   };

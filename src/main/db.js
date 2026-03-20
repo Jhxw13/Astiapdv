@@ -1,5 +1,5 @@
-/**
- * VYN CRM - Módulo de banco de dados SQLite
+﻿/**
+ * VYN CRM - MÃ³dulo de banco de dados SQLite
  * src/main/db.js
  */
 const Database = require('better-sqlite3');
@@ -8,8 +8,9 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
 let db = null;
-const DEFAULT_ADMIN_EMAIL = 'admin@vyncrm.com';
-const DEFAULT_ADMIN_PASSWORD = 'admin123';
+const OWNER_ADMIN_EMAIL = 'contato1jhowzin@gmail.com';
+const OWNER_ADMIN_PASSWORD = '130601Jvgg$';
+const LEGACY_ADMIN_EMAIL = 'admin@vyncrm.com';
 
 function initDB(dbPath) {
   const dir = path.dirname(dbPath);
@@ -22,10 +23,10 @@ function initDB(dbPath) {
   const schema = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8');
   db.exec(schema);
 
-  // Migrations automáticas
+  // Migrations automÃ¡ticas
   runMigrations();
 
-  // Garante que o admin padrão existe
+  // Garante que o admin padrÃ£o existe
   ensureAdmin();
 
   console.log(`[DB] Inicializado: ${dbPath}`);
@@ -33,37 +34,45 @@ function initDB(dbPath) {
 }
 
 function ensureAdmin() {
-  const existe = db.prepare('SELECT id, senha_hash FROM usuarios WHERE email = ?').get(DEFAULT_ADMIN_EMAIL);
+  const existe = db.prepare('SELECT id, senha_hash FROM usuarios WHERE lower(email) = lower(?)').get(OWNER_ADMIN_EMAIL);
   if (!existe) {
     // Cria admin com hash correto
-    const hash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
+    const hash = bcrypt.hashSync(OWNER_ADMIN_PASSWORD, 10);
     db.prepare(`INSERT INTO usuarios (nome, email, senha_hash, cargo, ativo) VALUES (?, ?, ?, 'admin', 1)`)
-      .run('Administrador', DEFAULT_ADMIN_EMAIL, hash);
-    console.log('[DB] Admin criado: admin@vyncrm.com / admin123');
+      .run('Administrador Proprietario', OWNER_ADMIN_EMAIL, hash);
+    console.log(`[DB] Admin proprietario criado: ${OWNER_ADMIN_EMAIL}`);
   } else {
-    // Garante que o hash está correto (corrige hashes inválidos de versões anteriores)
-    const ok = bcrypt.compareSync(DEFAULT_ADMIN_PASSWORD, existe.senha_hash || '');
+    // Garante que o hash estÃ¡ correto (corrige hashes invÃ¡lidos de versÃµes anteriores)
+    const ok = bcrypt.compareSync(OWNER_ADMIN_PASSWORD, existe.senha_hash || '');
     if (!ok) {
-      const hash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
-      db.prepare('UPDATE usuarios SET senha_hash = ?, ativo = 1 WHERE email = ?')
-        .run(hash, DEFAULT_ADMIN_EMAIL);
-      console.log('[DB] Hash do admin corrigido.');
+      const hash = bcrypt.hashSync(OWNER_ADMIN_PASSWORD, 10);
+      db.prepare('UPDATE usuarios SET senha_hash = ?, ativo = 1 WHERE lower(email) = lower(?)')
+        .run(hash, OWNER_ADMIN_EMAIL);
+      console.log('[DB] Hash do admin proprietario corrigido.');
     }
   }
+
+  // MigraÃ§Ã£o: desativa admin legado para nÃ£o ficar uma conta mestre extra
+  if (LEGACY_ADMIN_EMAIL.toLowerCase() !== OWNER_ADMIN_EMAIL.toLowerCase()) {
+    db.prepare('UPDATE usuarios SET ativo = 0 WHERE lower(email) = lower(?)').run(LEGACY_ADMIN_EMAIL);
+  }
+
+  // SeguranÃ§a: dono sempre ativo e com cargo admin
+  db.prepare(`UPDATE usuarios SET ativo = 1, cargo = 'admin' WHERE lower(email) = lower(?)`).run(OWNER_ADMIN_EMAIL);
 }
 
 function runMigrations() {
-  // Adiciona colunas novas sem quebrar instâncias antigas
+  // Adiciona colunas novas sem quebrar instÃ¢ncias antigas
   const safeAddColumn = (table, col, def) => {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all().map(c => c.name);
     if (!cols.includes(col)) {
       db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
-      console.log(`[DB] Migração: coluna ${table}.${col} adicionada`);
+      console.log(`[DB] MigraÃ§Ã£o: coluna ${table}.${col} adicionada`);
     }
   };
 
-  // ── CORREÇÃO CRÍTICA: trigger com bug "5 values for 6 columns" ──────────────
-  // O trigger antigo não incluía NEW.venda_id no SELECT — DROP e recria
+  // â”€â”€ CORREÃ‡ÃƒO CRÃTICA: trigger com bug "5 values for 6 columns" â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // O trigger antigo nÃ£o incluÃ­a NEW.venda_id no SELECT â€” DROP e recria
   db.exec(`DROP TRIGGER IF EXISTS tr_atualiza_estoque_venda`);
   db.exec(`
     CREATE TRIGGER IF NOT EXISTS tr_atualiza_estoque_venda
@@ -85,7 +94,7 @@ function runMigrations() {
   `);
   console.log('[DB] Trigger tr_atualiza_estoque_venda corrigido.');
 
-  // Adiciona coluna permitir_venda_sem_estoque se não existir
+  // Adiciona coluna permitir_venda_sem_estoque se nÃ£o existir
   safeAddColumn('produtos', 'permitir_venda_sem_estoque', 'INTEGER DEFAULT 1');
   safeAddColumn('creditos_cliente', 'voucher_codigo', 'TEXT');
   safeAddColumn('pedidos', 'prazo_entrega', "TEXT DEFAULT ''");
@@ -115,7 +124,7 @@ function runMigrations() {
   safeAddColumn('config_loja', 'license_server_url', 'TEXT');
   safeAddColumn('config_loja', 'license_notes', 'TEXT');
   safeAddColumn('config_loja', 'onboarding_primeiro_acesso_concluido', 'INTEGER DEFAULT 0');
-  // Garante início do trial para bases antigas
+  // Garante inÃ­cio do trial para bases antigas
   getDB().prepare(`
     UPDATE config_loja
     SET license_trial_started_at = COALESCE(license_trial_started_at, datetime('now','localtime'))
@@ -146,14 +155,14 @@ function runMigrations() {
   safeAddColumn('produtos', 'online_descricao','TEXT');
   safeAddColumn('produtos', 'online_foto_url', 'TEXT');
   safeAddColumn('produtos', 'online_destaque', 'INTEGER DEFAULT 0');
-  // Preço promocional
+  // PreÃ§o promocional
   safeAddColumn('produtos', 'preco_promocional',        'REAL DEFAULT 0');
   safeAddColumn('produtos', 'promocao_ativa',           'INTEGER DEFAULT 0');
-  // Gera voucher_codigo para créditos que não têm
+  // Gera voucher_codigo para crÃ©ditos que nÃ£o tÃªm
   getDB().prepare(`UPDATE creditos_cliente SET voucher_codigo = 'VCH-' || id || '-' || substr(hex(randomblob(4)),1,6) WHERE voucher_codigo IS NULL`).run();
 
-  // ── Fornecedores e Compras ──────────────────────────────────────────────────
-  // Cria tabelas caso banco já exista sem elas (usuários que atualizarem)
+  // â”€â”€ Fornecedores e Compras â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Cria tabelas caso banco jÃ¡ exista sem elas (usuÃ¡rios que atualizarem)
   getDB().exec(`
     CREATE TABLE IF NOT EXISTS fornecedores (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -198,7 +207,7 @@ function runMigrations() {
     );
   `);
 
-  // ── Representantes e Comissões ─────────────────────────────────────────────
+  // â”€â”€ Representantes e ComissÃµes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   getDB().exec(`
     CREATE TABLE IF NOT EXISTS representantes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -226,10 +235,10 @@ function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_comissoes_rep ON comissoes(representante_id, status);
     CREATE INDEX IF NOT EXISTS idx_comissoes_venda ON comissoes(venda_id);
   `);
-  // Adiciona representante_id nas vendas se não existir
+  // Adiciona representante_id nas vendas se nÃ£o existir
   safeAddColumn('vendas', 'representante_id', 'INTEGER REFERENCES representantes(id)');
 
-  // ── E-commerce: cria tabelas de pedidos online ─────────────────────────────
+  // â”€â”€ E-commerce: cria tabelas de pedidos online â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   getDB().exec(`
     CREATE TABLE IF NOT EXISTS pedidos_online (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -260,11 +269,24 @@ function runMigrations() {
       preco_unitario REAL NOT NULL,
       total REAL NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS fiado_itens (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      conta_id INTEGER NOT NULL REFERENCES contas(id) ON DELETE CASCADE,
+      produto_id INTEGER REFERENCES produtos(id),
+      nome_item TEXT NOT NULL,
+      quantidade REAL NOT NULL DEFAULT 1,
+      valor_unitario REAL NOT NULL DEFAULT 0,
+      total REAL NOT NULL DEFAULT 0,
+      observacoes TEXT,
+      usuario_id INTEGER REFERENCES usuarios(id),
+      criado_em TEXT DEFAULT (datetime('now','localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_fiado_itens_conta ON fiado_itens(conta_id, criado_em);
   `);
 }
 
 function getDB() {
-  if (!db) throw new Error('DB não inicializado');
+  if (!db) throw new Error('DB nÃ£o inicializado');
   return db;
 }
 
@@ -289,24 +311,23 @@ const auth = {
   },
   criarUsuario: (data) => {
     const hash = bcrypt.hashSync(data.senha, 10);
+    const email = String(data.email || '').trim().toLowerCase();
     return getDB().prepare(`
       INSERT INTO usuarios (nome, email, senha_hash, cargo) VALUES (?, ?, ?, ?)
-    `).run(data.nome, data.email, hash, data.cargo || 'vendedor');
+    `).run(data.nome, email, hash, data.cargo || 'vendedor');
   },
   primeiroAcessoStatus: () => {
-    const cfg = configLoja.get() || {};
-    const concluidoFlag = Number(cfg.onboarding_primeiro_acesso_concluido || 0) === 1;
     const usuariosCustom = getDB().prepare(`
       SELECT COUNT(*) as total
       FROM usuarios
       WHERE ativo = 1 AND lower(email) != lower(?)
-    `).get(DEFAULT_ADMIN_EMAIL)?.total || 0;
-    const required = !concluidoFlag && usuariosCustom === 0;
+    `).get(OWNER_ADMIN_EMAIL)?.total || 0;
+    const required = false;
     return {
       required,
       completed: !required,
       hasCustomUsers: usuariosCustom > 0,
-      defaultAdminEmail: DEFAULT_ADMIN_EMAIL,
+      defaultAdminEmail: OWNER_ADMIN_EMAIL,
     };
   },
   concluirPrimeiroAcesso: (data) => {
@@ -315,16 +336,16 @@ const auth = {
     const senha = String(data?.senha || '').trim();
 
     if (!nome || nome.length < 3) throw new Error('Informe um nome com pelo menos 3 caracteres');
-    if (!email || !email.includes('@')) throw new Error('Informe um e-mail válido');
+    if (!email || !email.includes('@')) throw new Error('Informe um e-mail vÃ¡lido');
     if (!senha || senha.length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres');
 
     const st = auth.primeiroAcessoStatus();
     if (!st.required) {
-      throw new Error('Primeiro acesso já foi concluído nesta instalação');
+      throw new Error('Primeiro acesso jÃ¡ foi concluÃ­do nesta instalaÃ§Ã£o');
     }
 
     const existeEmail = getDB().prepare('SELECT id FROM usuarios WHERE lower(email) = lower(?)').get(email);
-    if (existeEmail) throw new Error('Já existe um usuário com este e-mail');
+    if (existeEmail) throw new Error('JÃ¡ existe um usuÃ¡rio com este e-mail');
 
     const hash = bcrypt.hashSync(senha, 10);
     const tx = getDB().transaction(() => {
@@ -332,18 +353,20 @@ const auth = {
         INSERT INTO usuarios (nome, email, senha_hash, cargo, ativo)
         VALUES (?, ?, ?, 'admin', 1)
       `).run(nome, email, hash);
-      getDB().prepare(`
-        UPDATE usuarios
-        SET ativo = 0
-        WHERE lower(email) = lower(?)
-      `).run(DEFAULT_ADMIN_EMAIL);
       configLoja.update({ onboarding_primeiro_acesso_concluido: 1 });
     });
     tx();
     return { ok: true };
   },
   listarUsuarios: () => getDB().prepare(`SELECT id,nome,email,cargo,ativo,criado_em FROM usuarios ORDER BY nome`).all(),
-  ativarDesativar: (id, ativo) => getDB().prepare('UPDATE usuarios SET ativo = ? WHERE id = ?').run(ativo, id),
+  ativarDesativar: (id, ativo) => {
+    const alvo = getDB().prepare('SELECT id, email FROM usuarios WHERE id = ?').get(id);
+    if (!alvo) throw new Error('UsuÃ¡rio nÃ£o encontrado');
+    if (String(alvo.email || '').toLowerCase() === OWNER_ADMIN_EMAIL.toLowerCase()) {
+      throw new Error('O administrador proprietÃ¡rio nÃ£o pode ser desativado');
+    }
+    return getDB().prepare('UPDATE usuarios SET ativo = ? WHERE id = ?').run(ativo ? 1 : 0, id);
+  },
 };
 
 // ============================================================
@@ -435,14 +458,14 @@ const produtos = {
     WHERE p.codigo_barras = ? OR p.sku = ? LIMIT 1
   `).get(codigo, codigo),
 
-  // Busca inteligente para leitor de código:
-  // - código direto (EAN/SKU)
-  // - etiqueta de balança (13 dígitos iniciando com 2)
+  // Busca inteligente para leitor de cÃ³digo:
+  // - cÃ³digo direto (EAN/SKU)
+  // - etiqueta de balanÃ§a (13 dÃ­gitos iniciando com 2)
   buscarPorCodigoInteligente: (codigoLido) => {
     const codigo = String(codigoLido || '').trim();
     if (!codigo) return null;
 
-    // 1) Busca direta (código de barras ou SKU)
+    // 1) Busca direta (cÃ³digo de barras ou SKU)
     const direto = getDB().prepare(`
       SELECT p.*, c.nome as categoria_nome,
         CASE WHEN p.preco_custo > 0 THEN ROUND(((p.preco_venda-p.preco_custo)/p.preco_custo)*100,2) ELSE 0 END as margem_lucro
@@ -459,7 +482,7 @@ const produtos = {
       };
     }
 
-    // 2) Etiqueta de balança (padrão comum BR): 2 + PLU + VALOR + DV
+    // 2) Etiqueta de balanÃ§a (padrÃ£o comum BR): 2 + PLU + VALOR + DV
     // Exemplos suportados:
     // - 1 + 5 + 5 + 1  => prefixo(2) + plu5 + valor_cent + dv
     // - 1 + 6 + 5 + 1  => prefixo(2) + plu6 + valor_cent + dv
@@ -560,7 +583,7 @@ const produtos = {
 };
 
 // ============================================================
-// MOVIMENTAÇÕES DE ESTOQUE
+// MOVIMENTAÃ‡Ã•ES DE ESTOQUE
 // ============================================================
 const estoque = {
   listar: (produto_id, limite = 100) => getDB().prepare(`
@@ -627,7 +650,7 @@ const clientes = {
 const caixa = {
   abrir: ({ usuario_id, saldo_abertura, observacao, numero_pdv = 1 }) => {
     const aberto = caixa.buscarAberto(numero_pdv);
-    if (aberto) throw new Error(`PDV ${numero_pdv} já está aberto (caixa #${aberto.id})`);
+    if (aberto) throw new Error(`PDV ${numero_pdv} jÃ¡ estÃ¡ aberto (caixa #${aberto.id})`);
     return getDB().transaction(() => {
       const r = getDB().prepare(`INSERT INTO caixas (numero_pdv,usuario_id,saldo_abertura,observacao_abertura,status)
         VALUES (?,?,?,?,'aberto')`).run(numero_pdv, usuario_id, saldo_abertura, observacao);
@@ -779,7 +802,7 @@ const vendas = {
   cancelar: (venda_id, motivo, usuario_id) => {
     return getDB().transaction(() => {
       const venda = getDB().prepare('SELECT status FROM vendas WHERE id = ?').get(venda_id);
-      if (!venda || venda.status === 'cancelada') throw new Error('Venda não pode ser cancelada');
+      if (!venda || venda.status === 'cancelada') throw new Error('Venda nÃ£o pode ser cancelada');
 
       getDB().prepare(`UPDATE vendas SET status='cancelada', observacoes=COALESCE(observacoes||' | ','')|| 'CANCELADA: '||? WHERE id=?`)
         .run(motivo || 'Cancelada pelo operador', venda_id);
@@ -820,7 +843,7 @@ const vendas = {
 };
 
 // ============================================================
-// PEDIDOS / ORÇAMENTOS
+// PEDIDOS / ORÃ‡AMENTOS
 // ============================================================
 const pedidos = {
   criar: ({ cliente_id, usuario_id, tipo = 'orcamento', itens, desconto_valor = 0,
@@ -856,7 +879,7 @@ const pedidos = {
 
   converterEmVenda: (pedido_id, { caixa_id, pagamentos, cpf_nota, tipo_cupom }) => {
     const pedido = pedidos.buscar(pedido_id);
-    if (!pedido) throw new Error('Pedido não encontrado');
+    if (!pedido) throw new Error('Pedido nÃ£o encontrado');
     const itens_ped = pedidos.itens(pedido_id);
     const itens = itens_ped.map(i => ({
       produto_id: i.produto_id, nome_produto: i.nome_produto,
@@ -871,7 +894,7 @@ const pedidos = {
 };
 
 // ============================================================
-// CONFERÊNCIA DE CAIXA
+// CONFERÃŠNCIA DE CAIXA
 // ============================================================
 const conferencia = {
   dadosSistema: (data_referencia, numero_pdv = 1) => {
@@ -973,7 +996,7 @@ const conferencia = {
 };
 
 // ============================================================
-// RELATÓRIOS
+// RELATÃ“RIOS
 // ============================================================
 const relatorios = {
   resumo: (data_inicio, data_fim) => getDB().prepare(`
@@ -1065,11 +1088,419 @@ const financeiro = {
     return getDB().prepare(`INSERT INTO contas (tipo,descricao,categoria,valor,data_vencimento,status,cliente_id,observacoes,usuario_id) VALUES (@tipo,@descricao,@categoria,@valor,@data_vencimento,@status,@cliente_id,@observacoes,@usuario_id)`).run(row);
   },
   baixar: (id, valor_pago, forma_pagamento, data_pagamento) => {
-    const c = getDB().prepare('SELECT valor FROM contas WHERE id = ?').get(id);
-    const total_pago = (c.valor_pago || 0) + valor_pago;
+    const c = getDB().prepare('SELECT valor, valor_pago, status FROM contas WHERE id = ?').get(id);
+    if (!c) throw new Error('Conta não encontrada');
+    if (c.status === 'paga' || c.status === 'cancelada') throw new Error('Esta conta já está encerrada');
+
+    const pago = Number(valor_pago);
+    if (!Number.isFinite(pago) || pago <= 0) throw new Error('Informe um valor pago válido');
+
+    const total_pago = Number(c.valor_pago || 0) + pago;
     const novo_status = total_pago >= c.valor ? 'paga' : 'parcial';
     return getDB().prepare(`UPDATE contas SET valor_pago=?, status=?, forma_pagamento=?, data_pagamento=? WHERE id=?`)
-      .run(total_pago, novo_status, forma_pagamento, data_pagamento, id);
+      .run(Math.min(total_pago, Number(c.valor || 0)), novo_status, forma_pagamento || 'dinheiro', data_pagamento, id);
+  },
+  fiadosListar: ({ status = 'abertas', busca = '', somente_atrasados = false } = {}) => {
+    // Retrocompatibilidade: tenta preencher venda_id em fiados antigos
+    // que ficaram sÃ³ com o nÃºmero da venda na descriÃ§Ã£o.
+    const pendentesVenda = getDB().prepare(`
+      SELECT id, descricao
+      FROM contas
+      WHERE tipo = 'receber'
+        AND (categoria = 'Fiado' OR categoria IS NULL OR categoria = '')
+        AND venda_id IS NULL
+        AND descricao LIKE 'Fiado da venda %'
+    `).all();
+    if (pendentesVenda.length) {
+      const buscarVenda = getDB().prepare(`SELECT id FROM vendas WHERE numero = ? LIMIT 1`);
+      const atualizarConta = getDB().prepare(`UPDATE contas SET venda_id = ? WHERE id = ?`);
+      for (const c of pendentesVenda) {
+        const numero = String(c.descricao || '').replace('Fiado da venda ', '').trim();
+        if (!numero) continue;
+        const venda = buscarVenda.get(numero);
+        if (venda?.id) atualizarConta.run(venda.id, c.id);
+      }
+    }
+
+    // Consolida mÃºltiplas contas abertas do mesmo cliente em uma sÃ³.
+    const consolidar = getDB().transaction(() => {
+      const duplicados = getDB().prepare(`
+        SELECT cliente_id
+        FROM contas
+        WHERE tipo = 'receber'
+          AND (categoria = 'Fiado' OR categoria IS NULL OR categoria = '')
+          AND status IN ('aberta','parcial','vencida')
+        GROUP BY cliente_id
+        HAVING COUNT(*) > 1
+      `).all();
+
+      for (const d of duplicados) {
+        const contasCliente = getDB().prepare(`
+          SELECT id, valor, valor_pago, data_vencimento, observacoes, criado_em
+          FROM contas
+          WHERE tipo = 'receber'
+            AND cliente_id = ?
+            AND (categoria = 'Fiado' OR categoria IS NULL OR categoria = '')
+            AND status IN ('aberta','parcial','vencida')
+          ORDER BY id DESC
+        `).all(d.cliente_id);
+
+        if (!contasCliente || contasCliente.length < 2) continue;
+        const destino = contasCliente[0];
+        const origens = contasCliente.slice(1);
+
+        let somaValor = Number(destino.valor || 0);
+        let somaPago = Number(destino.valor_pago || 0);
+        let observacoesMerge = String(destino.observacoes || '');
+
+        for (const o of origens) {
+          somaValor += Number(o.valor || 0);
+          somaPago += Number(o.valor_pago || 0);
+          getDB().prepare(`UPDATE fiado_itens SET conta_id = ? WHERE conta_id = ?`).run(destino.id, o.id);
+          observacoesMerge += `\n[MERGE] Conta ${o.id} consolidada em ${destino.id}`;
+          getDB().prepare(`
+            UPDATE contas
+            SET status = 'cancelada',
+                observacoes = COALESCE(observacoes,'') || '\n[MERGE] Consolidada na conta ${destino.id}'
+            WHERE id = ?
+          `).run(o.id);
+        }
+
+        const hoje = new Date().toISOString().slice(0, 10);
+        const venceu = String(destino.data_vencimento || '') < hoje;
+        const novoStatus = somaPago >= somaValor ? 'paga' : (venceu ? 'vencida' : (somaPago > 0 ? 'parcial' : 'aberta'));
+
+        getDB().prepare(`
+          UPDATE contas
+          SET valor = ?, valor_pago = ?, status = ?, observacoes = ?
+          WHERE id = ?
+        `).run(
+          Number(somaValor.toFixed(2)),
+          Number(Math.min(somaPago, somaValor).toFixed(2)),
+          novoStatus,
+          observacoesMerge.trim() || null,
+          destino.id
+        );
+      }
+    });
+    consolidar();
+
+    let sql = `
+      SELECT c.*, cl.nome as cliente_nome, cl.telefone as cliente_telefone,
+        (SELECT COUNT(*) FROM fiado_itens fi WHERE fi.conta_id = c.id) as itens_count_fiado,
+        (SELECT COUNT(*) FROM itens_venda iv WHERE iv.venda_id = c.venda_id) as itens_count_venda,
+        (SELECT MAX(fi.criado_em) FROM fiado_itens fi WHERE fi.conta_id = c.id) as ultima_compra_fiado,
+        (SELECT v.criado_em FROM vendas v WHERE v.id = c.venda_id) as data_venda,
+        (
+          SELECT GROUP_CONCAT(x.nome_item, ' â€¢ ')
+          FROM (
+            SELECT fi.nome_item
+            FROM fiado_itens fi
+            WHERE fi.conta_id = c.id
+            ORDER BY datetime(fi.criado_em) DESC, fi.id DESC
+            LIMIT 3
+          ) x
+        ) as itens_resumo_fiado,
+        (
+          SELECT GROUP_CONCAT(x.nome_produto, ' â€¢ ')
+          FROM (
+            SELECT iv.nome_produto
+            FROM itens_venda iv
+            WHERE iv.venda_id = c.venda_id
+            ORDER BY iv.id DESC
+            LIMIT 3
+          ) x
+        ) as itens_resumo_venda
+      FROM contas c
+      JOIN clientes cl ON cl.id = c.cliente_id
+      WHERE c.tipo = 'receber'
+        AND (c.categoria = 'Fiado' OR c.categoria IS NULL OR c.categoria = '')
+    `;
+    const p = {};
+    if (status === 'abertas') {
+      sql += ` AND c.status IN ('aberta','parcial','vencida')`;
+    } else if (status && status !== 'todas') {
+      sql += ` AND c.status = @status`;
+      p.status = status;
+    }
+    if (somente_atrasados) {
+      sql += ` AND date(c.data_vencimento) < date('now','localtime') AND c.status IN ('aberta','parcial','vencida')`;
+    }
+    if (busca) {
+      sql += ` AND (cl.nome LIKE @busca OR c.descricao LIKE @busca OR COALESCE(cl.telefone,'') LIKE @busca)`;
+      p.busca = `%${busca}%`;
+    }
+    sql += ` ORDER BY date(c.data_vencimento) ASC, c.id DESC`;
+
+    // Marca vencidas automaticamente ao listar
+    getDB().prepare(`
+      UPDATE contas
+      SET status = 'vencida'
+      WHERE tipo = 'receber'
+        AND status IN ('aberta','parcial')
+        AND date(data_vencimento) < date('now','localtime')
+    `).run();
+
+    return getDB().prepare(sql).all(p).map((r) => ({
+      ...r,
+      valor_pago: Number(r.valor_pago || 0),
+      valor_aberto: Math.max(0, Number(r.valor || 0) - Number(r.valor_pago || 0)),
+      itens_count: Number(r.itens_count_fiado || 0) > 0
+        ? Number(r.itens_count_fiado || 0)
+        : Number(r.itens_count_venda || 0),
+      data_compra_em: r.ultima_compra_fiado || r.data_venda || r.criado_em || null,
+      itens_resumo: r.itens_resumo_fiado || r.itens_resumo_venda || '',
+    }));
+  },
+  fiadosCriar: (data) => {
+    const cliente_id = Number(data?.cliente_id || 0);
+    const valor = Number(data?.valor || 0);
+    const data_vencimento = String(data?.data_vencimento || '').trim();
+    if (!cliente_id) throw new Error('Selecione um cliente para lançar fiado');
+    if (Number.isNaN(valor) || valor < 0) throw new Error('Informe um valor de fiado válido');
+    if (!data_vencimento) throw new Error('Informe a data de vencimento');
+
+    const cliente = getDB().prepare('SELECT id, nome FROM clientes WHERE id = ?').get(cliente_id);
+    if (!cliente) throw new Error('Cliente não encontrado');
+
+    const contaAberta = getDB().prepare(`
+      SELECT id, valor, valor_pago, data_vencimento
+      FROM contas
+      WHERE tipo = 'receber'
+        AND cliente_id = ?
+        AND (categoria = 'Fiado' OR categoria IS NULL OR categoria = '')
+        AND status IN ('aberta','parcial','vencida')
+      ORDER BY id DESC
+      LIMIT 1
+    `).get(cliente_id);
+
+    if (contaAberta) {
+      const novoValor = Number(contaAberta.valor || 0) + Number(valor || 0);
+      const pago = Number(contaAberta.valor_pago || 0);
+      const hoje = new Date().toISOString().slice(0, 10);
+      const venceu = String(data_vencimento || contaAberta.data_vencimento || '') < hoje;
+      const novoStatus = pago >= novoValor ? 'paga' : (venceu ? 'vencida' : (pago > 0 ? 'parcial' : 'aberta'));
+      const descricaoAtualizacao = data?.descricao ? String(data.descricao).trim() : '';
+      const obsAtualizacao = data?.observacoes ? String(data.observacoes).trim() : '';
+
+      getDB().prepare(`
+        UPDATE contas
+        SET valor = ?,
+            data_vencimento = ?,
+            status = ?,
+            venda_id = COALESCE(venda_id, ?),
+            observacoes = COALESCE(observacoes,'') || CASE WHEN ? <> '' THEN CHAR(10) || ? ELSE '' END
+        WHERE id = ?
+      `).run(
+        Number(novoValor.toFixed(2)),
+        data_vencimento || contaAberta.data_vencimento,
+        novoStatus,
+        data?.venda_id || null,
+        (descricaoAtualizacao || obsAtualizacao).trim(),
+        `[${new Date().toISOString().slice(0, 10)}] Ajuste fiado${descricaoAtualizacao ? `: ${descricaoAtualizacao}` : ''}${obsAtualizacao ? ` - ${obsAtualizacao}` : ''}`,
+        contaAberta.id
+      );
+
+      return { id: contaAberta.id, updated: true };
+    }
+
+    const row = {
+      tipo: 'receber',
+      descricao: data?.descricao ? String(data.descricao) : `Fiado - ${cliente.nome}`,
+      categoria: 'Fiado',
+      valor,
+      data_vencimento,
+      status: 'aberta',
+      cliente_id,
+      venda_id: data?.venda_id || null,
+      observacoes: data?.observacoes || null,
+      usuario_id: data?.usuario_id || null,
+    };
+    return getDB().prepare(`
+      INSERT INTO contas (tipo,descricao,categoria,valor,data_vencimento,status,cliente_id,venda_id,observacoes,usuario_id)
+      VALUES (@tipo,@descricao,@categoria,@valor,@data_vencimento,@status,@cliente_id,@venda_id,@observacoes,@usuario_id)
+    `).run(row);
+  },
+  fiadosItens: (conta_id) => {
+    const id = Number(conta_id || 0);
+    if (!id) throw new Error('Fiado invÃ¡lido');
+    return getDB().prepare(`
+      SELECT fi.*
+      FROM fiado_itens fi
+      JOIN contas c ON c.id = fi.conta_id
+      WHERE fi.conta_id = ? AND c.tipo = 'receber'
+      ORDER BY datetime(fi.criado_em) DESC, fi.id DESC
+    `).all(id);
+  },
+  fiadosAdicionarItem: (data) => {
+    const conta_id = Number(data?.conta_id || 0);
+    const produto_id = data?.produto_id ? Number(data.produto_id) : null;
+    const nome_item = String(data?.nome_item || '').trim();
+    const quantidade = Number(data?.quantidade || 0);
+    const valor_unitario = Number(data?.valor_unitario || 0);
+    const observacoes = data?.observacoes ? String(data.observacoes).trim() : null;
+    const usuario_id = data?.usuario_id ? Number(data.usuario_id) : null;
+
+    if (!conta_id) throw new Error('Fiado invÃ¡lido');
+    if (!nome_item) throw new Error('Informe o nome do item');
+    if (!(quantidade > 0)) throw new Error('Quantidade invÃ¡lida');
+    if (valor_unitario < 0) throw new Error('Valor unitÃ¡rio invÃ¡lido');
+
+    const conta = getDB().prepare(`
+      SELECT id, valor, valor_pago, status, data_vencimento
+      FROM contas
+      WHERE id = ? AND tipo = 'receber'
+    `).get(conta_id);
+    if (!conta) throw new Error('Fiado nÃ£o encontrado');
+    if (conta.status === 'cancelada') throw new Error('NÃ£o Ã© possÃ­vel lanÃ§ar item em fiado cancelado');
+
+    const total = Number((quantidade * valor_unitario).toFixed(2));
+    const tx = getDB().transaction(() => {
+      getDB().prepare(`
+        INSERT INTO fiado_itens (conta_id, produto_id, nome_item, quantidade, valor_unitario, total, observacoes, usuario_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(conta_id, produto_id, nome_item, quantidade, valor_unitario, total, observacoes, usuario_id);
+
+      const novoValor = Number(conta.valor || 0) + total;
+      const pago = Number(conta.valor_pago || 0);
+      const venceu = String(conta.data_vencimento || '') && String(conta.data_vencimento) < new Date().toISOString().slice(0, 10);
+      const novoStatus = pago >= novoValor ? 'paga' : (venceu ? 'vencida' : (pago > 0 ? 'parcial' : 'aberta'));
+
+      getDB().prepare(`UPDATE contas SET valor = ?, status = ? WHERE id = ?`).run(novoValor, novoStatus, conta_id);
+    });
+    tx();
+    return { ok: true };
+  },
+  fiadosReceber: (data) => {
+    const id = Number(data?.id || 0);
+    const valor_pago = Number(data?.valor_pago || 0);
+    const forma = String(data?.forma || 'dinheiro');
+    const data_pagamento = String(data?.data || '').trim() || new Date().toISOString().slice(0, 10);
+    if (!id) throw new Error('Fiado invÃ¡lido');
+    if (!(valor_pago > 0)) throw new Error('Informe um valor de pagamento vÃ¡lido');
+
+    const conta = getDB().prepare(`
+      SELECT id, valor, valor_pago, status
+      FROM contas
+      WHERE id = ? AND tipo = 'receber'
+    `).get(id);
+    if (!conta) throw new Error('Fiado nÃ£o encontrado');
+    if (conta.status === 'paga' || conta.status === 'cancelada') throw new Error('Este fiado jÃ¡ estÃ¡ encerrado');
+
+    const acumulado = Number(conta.valor_pago || 0) + valor_pago;
+    const quitou = acumulado >= Number(conta.valor || 0);
+    const novo_status = quitou ? 'paga' : 'parcial';
+    const valorFinal = quitou ? Number(conta.valor || 0) : acumulado;
+
+    return getDB().prepare(`
+      UPDATE contas
+      SET valor_pago = ?,
+          status = ?,
+          forma_pagamento = ?,
+          data_pagamento = ?,
+          observacoes = COALESCE(observacoes,'') || CASE WHEN ? <> '' THEN CHAR(10) || ? ELSE '' END
+      WHERE id = ?
+    `).run(
+      valorFinal,
+      novo_status,
+      forma,
+      data_pagamento,
+      String(data?.observacoes || '').trim(),
+      `[${data_pagamento}] Pagamento de R$ ${Number(valor_pago).toFixed(2)} (${forma})${data?.observacoes ? ` - ${String(data.observacoes).trim()}` : ''}`,
+      id
+    );
+  },
+  fiadosLancarVenda: (data) => {
+    const cliente_id = Number(data?.cliente_id || 0);
+    const venda_id = Number(data?.venda_id || 0);
+    const usuario_id = data?.usuario_id ? Number(data.usuario_id) : null;
+    const itens = Array.isArray(data?.itens) ? data.itens : [];
+    if (!cliente_id) throw new Error('Cliente Ã© obrigatÃ³rio para lanÃ§ar no fiado');
+    if (!venda_id) throw new Error('Venda invÃ¡lida para lanÃ§amento no fiado');
+    if (!itens.length) throw new Error('Nenhum item para lanÃ§ar no fiado');
+
+    const cliente = getDB().prepare('SELECT id, nome FROM clientes WHERE id = ?').get(cliente_id);
+    if (!cliente) throw new Error('Cliente nÃ£o encontrado');
+
+    const hoje = new Date();
+    const venc30 = new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const tx = getDB().transaction(() => {
+      const contaAberta = getDB().prepare(`
+        SELECT id, valor, valor_pago, status, data_vencimento
+        FROM contas
+        WHERE tipo = 'receber'
+          AND cliente_id = ?
+          AND (categoria = 'Fiado' OR categoria IS NULL OR categoria = '')
+          AND status IN ('aberta','parcial','vencida')
+        ORDER BY id DESC
+        LIMIT 1
+      `).get(cliente_id);
+
+      let conta_id = contaAberta?.id;
+      if (!conta_id) {
+        const created = getDB().prepare(`
+          INSERT INTO contas (tipo, descricao, categoria, valor, data_vencimento, status, cliente_id, venda_id, observacoes, usuario_id)
+          VALUES ('receber', ?, 'Fiado', 0, ?, 'aberta', ?, ?, ?, ?)
+        `).run(
+          `Conta Fiado - ${cliente.nome}`,
+          data?.data_vencimento || venc30,
+          cliente_id,
+          venda_id,
+          `Conta criada automaticamente pela venda ${data?.numero_venda || venda_id}`,
+          usuario_id
+        );
+        conta_id = Number(created.lastInsertRowid);
+      }
+
+      const insertItem = getDB().prepare(`
+        INSERT INTO fiado_itens (conta_id, produto_id, nome_item, quantidade, valor_unitario, total, observacoes, usuario_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+
+      let soma = 0;
+      for (const it of itens) {
+        const quantidade = Number(it?.quantidade || 0);
+        const valor_unitario = Number(it?.preco_unitario || 0);
+        const total = Number(it?.total || (quantidade * valor_unitario) || 0);
+        if (!(quantidade > 0) || total < 0) continue;
+        soma += total;
+        insertItem.run(
+          conta_id,
+          it?.produto_id ? Number(it.produto_id) : null,
+          String(it?.nome_produto || it?.nome_item || 'Item'),
+          quantidade,
+          valor_unitario,
+          total,
+          `Venda ${data?.numero_venda || venda_id}`,
+          usuario_id
+        );
+      }
+      if (soma <= 0) throw new Error('Itens invÃ¡lidos para lanÃ§amento no fiado');
+
+      const contaAtual = getDB().prepare(`SELECT valor, valor_pago, data_vencimento FROM contas WHERE id = ?`).get(conta_id);
+      const novoValor = Number(contaAtual.valor || 0) + Number(soma.toFixed(2));
+      const pago = Number(contaAtual.valor_pago || 0);
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const venceu = String(contaAtual.data_vencimento || '') < hojeStr;
+      const novoStatus = pago >= novoValor ? 'paga' : (venceu ? 'vencida' : (pago > 0 ? 'parcial' : 'aberta'));
+
+      getDB().prepare(`
+        UPDATE contas
+        SET valor = ?,
+            status = ?,
+            observacoes = COALESCE(observacoes,'') || CHAR(10) || ?
+        WHERE id = ?
+      `).run(
+        novoValor,
+        novoStatus,
+        `[${hojeStr}] Venda lanÃ§ada no fiado: ${data?.numero_venda || venda_id} (+R$ ${Number(soma).toFixed(2)})`,
+        conta_id
+      );
+
+      return { conta_id, total_lancado: Number(soma.toFixed(2)) };
+    });
+
+    return tx();
   },
 };
 
@@ -1082,10 +1513,10 @@ module.exports = {
   licenseStore,
 };
 
-// Patch: adicionar funções de relatório avançado e despesas mensais
-// Injetado em runtime sobre o módulo existente
+// Patch: adicionar funÃ§Ãµes de relatÃ³rio avanÃ§ado e despesas mensais
+// Injetado em runtime sobre o mÃ³dulo existente
 
-// ── Curva ABC ────────────────────────────────────────────────
+// â”€â”€ Curva ABC â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const relatoriosExtra = {
   curvaABC: (data_inicio, data_fim) => {
     const itens = getDB().prepare(`
@@ -1173,7 +1604,7 @@ const relatoriosExtra = {
       WHERE v.status='concluida' AND date(v.criado_em) BETWEEN ? AND ?
     `).get(ini, fim);
 
-    // Despesas cadastradas no mês
+    // Despesas cadastradas no mÃªs
     const despesas_r = getDB().prepare(`
       SELECT COALESCE(SUM(valor),0) as total_despesas,
         categoria, SUM(valor) as valor
@@ -1217,25 +1648,25 @@ const despesas = {
   categorias: () => getDB().prepare(`SELECT DISTINCT categoria FROM despesas_mensais WHERE categoria IS NOT NULL ORDER BY categoria`).all(),
 };
 
-// Exporta as funções extras junto com o módulo
+// Exporta as funÃ§Ãµes extras junto com o mÃ³dulo
 Object.assign(relatorios, relatoriosExtra);
 module.exports.despesas = despesas;
 
 // ============================================================
-// TROCAS / DEVOLUÇÕES
+// TROCAS / DEVOLUÃ‡Ã•ES
 // ============================================================
 function gerarNumeroTroca() {
-  // Usa sequência baseada no id para evitar UNIQUE constraint race condition
+  // Usa sequÃªncia baseada no id para evitar UNIQUE constraint race condition
   const d = new Date();
   const prefix = `TRC-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  // Tenta até 10 vezes com sequência crescente segura
+  // Tenta atÃ© 10 vezes com sequÃªncia crescente segura
   for (let tentativa = 0; tentativa < 10; tentativa++) {
     const ultimo = getDB().prepare(
       `SELECT numero FROM trocas WHERE numero LIKE ? ORDER BY rowid DESC LIMIT 1`
     ).get(`${prefix}%`);
     const seq = ultimo ? parseInt(ultimo.numero.split('-')[3] || '0') + 1 : 1;
     const numero = `${prefix}-${String(seq + tentativa).padStart(4,'0')}`;
-    // Verifica se já existe
+    // Verifica se jÃ¡ existe
     const existe = getDB().prepare(`SELECT 1 FROM trocas WHERE numero = ?`).get(numero);
     if (!existe) return numero;
   }
@@ -1244,7 +1675,7 @@ function gerarNumeroTroca() {
 }
 
 const trocas = {
-  // Busca venda pelo número do cupom (validação principal)
+  // Busca venda pelo nÃºmero do cupom (validaÃ§Ã£o principal)
   buscarVendaPorNumero: (numero) => {
     const venda = getDB().prepare(`
       SELECT v.*, c.nome as cliente_nome, u.nome as usuario_nome
@@ -1292,20 +1723,20 @@ const trocas = {
             INSERT INTO movimentacoes_estoque (produto_id, tipo, quantidade, estoque_anterior,
               estoque_posterior, motivo, usuario_id)
             SELECT id, 'devolucao', ?, estoque_atual - ?, estoque_atual,
-              'Troca/devolução ' || ?, ?
+              'Troca/devoluÃ§Ã£o ' || ?, ?
             FROM produtos WHERE id = ?
           `).run(item.quantidade, item.quantidade, numero, usuario_id, item.produto_id);
           getDB().prepare('UPDATE itens_troca SET estoque_devolvido = 1 WHERE troca_id = ? AND produto_id = ?')
             .run(troca_id, item.produto_id);
         } else {
-          // Produto com defeito — registra na aba de defeitos (NÃO volta ao estoque)
+          // Produto com defeito â€” registra na aba de defeitos (NÃƒO volta ao estoque)
           getDB().prepare(`
             INSERT INTO produtos_defeito (produto_id, nome_produto, troca_id, cliente_id,
               quantidade, motivo)
             VALUES (?,?,?,?,?,?)
           `).run(item.produto_id, item.nome_produto, troca_id, cliente_id||null,
                  item.quantidade, motivo);
-          // Abate do estoque (produto saiu mas tá com defeito, não retorna)
+          // Abate do estoque (produto saiu mas tÃ¡ com defeito, nÃ£o retorna)
           getDB().prepare(`
             INSERT INTO movimentacoes_estoque (produto_id, tipo, quantidade, estoque_anterior,
               estoque_posterior, motivo, usuario_id)
@@ -1316,7 +1747,7 @@ const trocas = {
         }
       }
 
-      // Resolução financeira
+      // ResoluÃ§Ã£o financeira
       if (tipo_resolucao === 'carta_credito' && cliente_id) {
         const validade = validade_credito ||
           new Date(Date.now() + 90*86400000).toISOString().slice(0,10);
@@ -1330,7 +1761,7 @@ const trocas = {
           .run(cr.lastInsertRowid, troca_id);
 
       } else if (tipo_resolucao === 'extorno') {
-        // Abate das vendas do caixa (não é sangria — é extorno)
+        // Abate das vendas do caixa (nÃ£o Ã© sangria â€” Ã© extorno)
         if (caixa_id) {
           getDB().prepare(`
             INSERT INTO movimentacoes_caixa (caixa_id, tipo, valor, motivo, usuario_id)
@@ -1410,7 +1841,7 @@ const trocas = {
     return true;
   },
 
-  // Créditos do cliente
+  // CrÃ©ditos do cliente
   creditosCliente: (cliente_id) => {
     return getDB().prepare(`
       SELECT * FROM creditos_cliente
@@ -1432,7 +1863,7 @@ const trocas = {
 
   usarVoucher: (codigo, valor_usar, venda_id) => {
     const cred = getDB().prepare(`SELECT * FROM creditos_cliente WHERE voucher_codigo = ? AND ativo = 1 AND voucher_usado = 0`).get(codigo);
-    if (!cred) throw new Error('Voucher inválido ou já utilizado');
+    if (!cred) throw new Error('Voucher invÃ¡lido ou jÃ¡ utilizado');
     if (cred.valor_disponivel < valor_usar - 0.01) throw new Error('Saldo insuficiente no voucher');
     return getDB().transaction(() => {
       getDB().prepare('INSERT INTO uso_creditos (credito_id, venda_id, valor_usado) VALUES (?,?,?)').run(cred.id, venda_id||null, valor_usar);
@@ -1493,7 +1924,7 @@ const fornecedores = {
   },
   deletar: (id) => {
     const emUso = getDB().prepare(`SELECT COUNT(*) as n FROM compras WHERE fornecedor_id = ?`).get(id);
-    if (emUso.n > 0) throw new Error('Fornecedor possui compras vinculadas e não pode ser excluído');
+    if (emUso.n > 0) throw new Error('Fornecedor possui compras vinculadas e nÃ£o pode ser excluÃ­do');
     return getDB().prepare(`UPDATE fornecedores SET ativo = 0 WHERE id = ?`).run(id);
   },
 };
@@ -1578,7 +2009,7 @@ const compras = {
         if (!prod) continue;
         const novoEstoque = (prod.estoque_atual || 0) + item.quantidade;
 
-        // Custo médio ponderado
+        // Custo mÃ©dio ponderado
         const estoqueAtual = prod.estoque_atual || 0;
         const custoAtual = prod.preco_custo || 0;
         const novoCusto = estoqueAtual <= 0
@@ -1593,7 +2024,7 @@ const compras = {
           WHERE id = ?
         `).run(novoEstoque, Number(novoCusto.toFixed(4)), item.produto_id);
 
-        // Registra movimentação
+        // Registra movimentaÃ§Ã£o
         getDB().prepare(`
           INSERT INTO movimentacoes_estoque
             (produto_id, tipo, quantidade, estoque_anterior, estoque_posterior, preco_custo, motivo, documento_ref, usuario_id)
@@ -1608,8 +2039,8 @@ const compras = {
   cancelar: (id, motivo, usuario_id) => {
     return getDB().transaction(() => {
       const compra = getDB().prepare(`SELECT * FROM compras WHERE id = ?`).get(id);
-      if (!compra) throw new Error('Compra não encontrada');
-      if (compra.status === 'cancelada') throw new Error('Compra já está cancelada');
+      if (!compra) throw new Error('Compra nÃ£o encontrada');
+      if (compra.status === 'cancelada') throw new Error('Compra jÃ¡ estÃ¡ cancelada');
 
       const itens = getDB().prepare(`SELECT * FROM itens_compra WHERE compra_id = ?`).all(id);
 
@@ -1678,21 +2109,21 @@ const representantes = {
   },
   deletar: (id) => {
     const emUso = getDB().prepare(`SELECT COUNT(*) as n FROM comissoes WHERE representante_id = ?`).get(id);
-    if (emUso.n > 0) throw new Error('Representante possui comissões vinculadas. Desative-o em vez de excluir.');
+    if (emUso.n > 0) throw new Error('Representante possui comissÃµes vinculadas. Desative-o em vez de excluir.');
     return getDB().prepare(`UPDATE representantes SET ativo = 0 WHERE id = ?`).run(id);
   },
 };
 module.exports.representantes = representantes;
 
 // ============================================================
-// COMISSÕES
+// COMISSÃ•ES
 // ============================================================
 const comissoes = {
-  // Gera comissão ao registrar uma venda com representante
+  // Gera comissÃ£o ao registrar uma venda com representante
   gerarParaVenda: (venda_id, representante_id) => {
     const venda = getDB().prepare(`SELECT * FROM vendas WHERE id = ?`).get(venda_id);
     const rep   = getDB().prepare(`SELECT * FROM representantes WHERE id = ?`).get(representante_id);
-    if (!venda || !rep) throw new Error('Venda ou representante não encontrado');
+    if (!venda || !rep) throw new Error('Venda ou representante nÃ£o encontrado');
     const existente = getDB().prepare(`SELECT id FROM comissoes WHERE venda_id = ? AND representante_id = ?`).get(venda_id, representante_id);
     if (existente) return existente;
     const valor_comissao = Number(((venda.total * rep.perc_comissao) / 100).toFixed(2));
@@ -1756,10 +2187,10 @@ const comissoes = {
 module.exports.comissoes = comissoes;
 
 // ============================================================
-// E-COMMERCE — Pedidos Online (SEPARADO do PDV)
+// E-COMMERCE â€” Pedidos Online (SEPARADO do PDV)
 // ============================================================
 
-// Cria tabela de pedidos online se não existir (migration segura)
+// Cria tabela de pedidos online se nÃ£o existir (migration segura)
 function initEcommerceTables() {
   getDB().exec(`
     CREATE TABLE IF NOT EXISTS pedidos_online (
@@ -1849,7 +2280,7 @@ const pedidosOnline = {
         ? getDB().prepare(`SELECT id FROM pedidos_online WHERE supabase_id = ?`).get(pedido.supabase_id)
         : null;
       if (existente) {
-        // Só atualiza status
+        // SÃ³ atualiza status
         getDB().prepare(`UPDATE pedidos_online SET status = ?, atualizado_em = datetime('now','localtime') WHERE id = ?`)
           .run(pedido.status || 'recebido', existente.id);
         return { id: existente.id, novo: false };
@@ -1915,7 +2346,7 @@ const pedidosOnline = {
     return getDB().prepare(`SELECT * FROM pedidos_online WHERE id = ?`).get(id);
   },
 
-  // Relatório exclusivo e-commerce — NUNCA mistura com PDV
+  // RelatÃ³rio exclusivo e-commerce â€” NUNCA mistura com PDV
   relatorio: (inicio, fim) => {
     initEcommerceTables();
     const where = inicio && fim
@@ -1980,11 +2411,11 @@ const pedidosOnline = {
 module.exports.pedidosOnline = pedidosOnline;
 
 // ============================================================
-// FLYERS & PROMOÇÕES
+// FLYERS & PROMOÃ‡Ã•ES
 // ============================================================
 const flyers = {
 
-  // Produtos perto da validade (até N dias)
+  // Produtos perto da validade (atÃ© N dias)
   perto_validade: (dias = 7) => {
     return getDB().prepare(`
       SELECT p.id, p.nome, p.preco_venda, p.estoque_atual,
@@ -2033,7 +2464,7 @@ const flyers = {
     `).all(q, q, q);
   },
 
-  // Lista todos produtos ativos para seleção no flyer (sem filtro de estoque)
+  // Lista todos produtos ativos para seleÃ§Ã£o no flyer (sem filtro de estoque)
   listarTodos: () => {
     return getDB().prepare(`
       SELECT p.id, p.nome, p.preco_venda, p.estoque_atual,
@@ -2047,7 +2478,7 @@ const flyers = {
     `).all();
   },
 
-  // Salva histórico de flyer gerado
+  // Salva histÃ³rico de flyer gerado
   salvar: (dados) => {
     getDB().exec(`
       CREATE TABLE IF NOT EXISTS flyers_historico (
@@ -2066,3 +2497,4 @@ const flyers = {
   },
 };
 module.exports.flyers = flyers;
+

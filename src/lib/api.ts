@@ -245,6 +245,17 @@ export const financeiroAPI = {
     invoke('financeiro:baixar', { id, valor_pago, forma, data }),
 };
 
+// —— FIADOS ——————————————————————————————————————————————————————————————————————————————
+export const fiadosAPI = {
+  listar: (f?: any) => invoke('fiados:listar', f),
+  criar: (d: any) => invoke('fiados:criar', d),
+  itens: (conta_id: number) => invoke('fiados:itens', conta_id),
+  adicionarItem: (d: any) => invoke('fiados:add-item', d),
+  lancarVenda: (d: any) => invoke('fiados:lancar-venda', d),
+  receber: (id: number, valor_pago: number, forma: string, data?: string, observacoes?: string) =>
+    invoke('fiados:receber', { id, valor_pago, forma, data, observacoes }),
+};
+
 // ── SISTEMA ───────────────────────────────────────────────────────────────────
 export const sistemaAPI = {
   backupExportar: () => window.vyn?.backupExportar(),

@@ -23,7 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   produtosAPI, clientesAPI, caixaAPI,
-  vendasAPI, authAPI, configAPI, sistemaAPI,
+  vendasAPI, authAPI, configAPI, sistemaAPI, fiadosAPI,
   representantesAPI, comissoesAPI
 } from "@/lib/api";
 import { enfileirarVenda, getStatusConexao } from "@/lib/offline";
@@ -33,7 +33,7 @@ import {
   ArrowRight, CheckCircle2, User, Percent,
   FileText, Shield, Printer, RotateCcw,
   Clock, Check, DollarSign, ChevronLeft,
-  Smartphone, Receipt, Banknote, QrCode, Ticket,
+  Smartphone, Receipt, Banknote, QrCode, Ticket, Wallet,
   Keyboard, UserCheck
 } from "lucide-react";
 
@@ -47,6 +47,7 @@ interface CartItem {
   preco_custo: number;
   quantidade: number;
   estoque: number;
+  permitir_venda_sem_estoque?: boolean;
   codigo_barras?: string;
   total: number;
 }
@@ -259,6 +260,7 @@ interface CheckoutProps {
     paymentMethod: string; valorRecebido: number;
     descontoAprovado: number; descontoValor: number;
     clienteId: string; cpfNota: string;
+    tipoCupom: "nao_fiscal" | "nfce" | "nfe";
     representanteId?: number;
   }) => Promise<void>;
   onVoltar: () => void;
@@ -276,7 +278,7 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       const key = e.key.toUpperCase();
-      const formaMap: Record<string, string> = { N: "dinheiro", C: "credito", D: "debito", P: "pix", V: "voucher" };
+      const formaMap: Record<string, string> = { N: "dinheiro", C: "credito", D: "debito", P: "pix", V: "voucher", F: "fiado" };
       if (formaMap[key]) { e.preventDefault(); setPaymentMethod(formaMap[key]); }
     };
     window.addEventListener("keydown", handler);
@@ -291,10 +293,19 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
   const [descontoAprovado, setDescontoAprovado] = useState(0);
   const [liberacao, setLiberacao] = useState<null | { titulo: string; descricao: string; cb: () => void }>(null);
 
+  useEffect(() => {
+    if (paymentMethod === "fiado") {
+      setTipoCupom("nao_fiscal");
+      setValorRecebido("");
+    }
+  }, [paymentMethod]);
+
   const subtotal = cart.reduce((s, i) => s + i.total, 0);
   const descontoFinal = descontoAprovado > 0 ? (subtotal * descontoAprovado) / 100 : 0;
   const total = subtotal - descontoFinal;
   const troco = paymentMethod === "dinheiro" ? Math.max(0, parseFloat(valorRecebido || "0") - total) : 0;
+  const fiadoSemCliente = paymentMethod === "fiado" && !clienteId;
+  const dinheiroInsuficiente = paymentMethod === "dinheiro" && parseFloat(valorRecebido || "0") < total;
 
   const handleDescontoPct = (v: string) => {
     setDescontoPct(v);
@@ -326,6 +337,7 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
     { value: "debito",   label: "Débito",    icon: CreditCard,  key: "D" },
     { value: "pix",      label: "PIX",       icon: QrCode,      key: "P" },
     { value: "voucher",  label: "Voucher",   icon: Ticket,      key: "V" },
+    { value: "fiado",    label: "Fiado",     icon: Wallet,      key: "F" },
   ];
 
   const clientesFiltrados = clientes.filter(c =>
@@ -551,6 +563,17 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
                 </button>
               ))}
             </div>
+            {paymentMethod === "fiado" && (
+              <div className={`px-3 py-2 rounded-lg text-xs border ${
+                fiadoSemCliente
+                  ? "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
+                  : "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300"
+              }`}>
+                {fiadoSemCliente
+                  ? "Selecione um cliente para finalizar em fiado."
+                  : "Venda será lançada automaticamente na conta de fiado do cliente."}
+              </div>
+            )}
           </div>
 
           {/* Valor recebido — só para dinheiro */}
@@ -615,7 +638,8 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
                 { id: "nfce"       as const, label: "NFC-e",  sub: "Cupom fiscal", icon: "📄", color: "green" },
                 { id: "nfe"        as const, label: "NF-e",   sub: "Nota fiscal", icon: "🗒️", color: "violet" },
               ].map(opt => (
-                <button key={opt.id} onClick={() => setTipoCupom(opt.id)}
+                <button key={opt.id} onClick={() => { if (paymentMethod !== "fiado") setTipoCupom(opt.id); }}
+                  disabled={paymentMethod === "fiado" && opt.id !== "nao_fiscal"}
                   className={`py-2.5 px-2 rounded-xl border-2 text-center transition-all ${
                     tipoCupom === opt.id
                       ? opt.color === "blue"   ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
@@ -629,7 +653,12 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
                 </button>
               ))}
             </div>
-            {tipoCupom !== "nao_fiscal" && (
+            {paymentMethod === "fiado" && (
+              <div className="mt-2 px-3 py-2 rounded-lg text-xs bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300">
+                Em venda no fiado, o documento fica como cupom não fiscal e a cobrança vai para a conta do cliente.
+              </div>
+            )}
+            {paymentMethod !== "fiado" && tipoCupom !== "nao_fiscal" && (
               <div className={`mt-2 px-3 py-2 rounded-lg text-xs ${tipoCupom === "nfce" ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300" : "bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800 text-violet-700 dark:text-violet-300"}`}>
                 {tipoCupom === "nfce"
                   ? "⚡ NFC-e será emitida via Focus NF-e. Certificado digital necessário."
@@ -644,13 +673,29 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
           </div>
 
           {/* Botão confirmar */}
+          {dinheiroInsuficiente && (
+            <div className="text-xs text-red-600 dark:text-red-400 font-semibold">
+              Valor recebido Ã© menor que o total da venda.
+            </div>
+          )}
           <button
-            onClick={() => onConfirmar({
-              paymentMethod, valorRecebido: parseFloat(valorRecebido || "0"),
-              descontoAprovado, descontoValor: descontoFinal,
-              clienteId, cpfNota, tipoCupom,
-              representanteId: representanteId ? parseInt(representanteId) : undefined,
-            })}
+            type="button"
+            onClick={() => {
+              if (fiadoSemCliente) {
+                toast({ title: "Selecione um cliente para lançar no fiado", variant: "destructive" });
+                return;
+              }
+              if (dinheiroInsuficiente) {
+                toast({ title: "Valor recebido menor que o total", variant: "destructive" });
+                return;
+              }
+              onConfirmar({
+                paymentMethod, valorRecebido: parseFloat(valorRecebido || "0"),
+                descontoAprovado, descontoValor: descontoFinal,
+                clienteId, cpfNota, tipoCupom,
+                representanteId: representanteId ? parseInt(representanteId) : undefined,
+              });
+            }}
             disabled={loading}
             className={`w-full py-4 rounded-2xl text-white font-black text-lg shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-3 ${
               tipoCupom === "nfce"
@@ -665,7 +710,9 @@ function TelaCheckout({ cart, clientes, representantes, loja, serverIP, onConfir
             ) : (
               <>
                 <CheckCircle2 className="w-6 h-6" />
-                {tipoCupom === "nfce" ? "Confirmar + Emitir NFC-e" : tipoCupom === "nfe" ? "Confirmar + Emitir NF-e" : "Confirmar Venda"}
+                {paymentMethod === "fiado"
+                  ? "Confirmar e Lançar no Fiado"
+                  : (tipoCupom === "nfce" ? "Confirmar + Emitir NFC-e" : tipoCupom === "nfe" ? "Confirmar + Emitir NF-e" : "Confirmar Venda")}
                 {" — R$ "}{total.toFixed(2)}
               </>
             )}
@@ -683,6 +730,7 @@ function TelaCupom({ venda, loja, onNova }: { venda: any; loja: any; onNova: () 
   const FORMA: Record<string, string> = {
     dinheiro: "Dinheiro", credito: "Cartão de Crédito",
     debito: "Cartão de Débito", pix: "PIX", voucher: "Voucher",
+    crediario: "Fiado", fiado: "Fiado",
   };
 
   const imprimirCupomNaoFiscal = (autoprint = false) => {
@@ -958,10 +1006,15 @@ export default function PDVNew() {
         e.preventDefault();
         window.location.href = '/caixa';
       }
+      // F8 → atalho para fiados
+      if (e.key === 'F8') {
+        e.preventDefault();
+        navigate('/fiados');
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [fase, cart, caixaAberto]);
+  }, [fase, cart, caixaAberto, navigate]);
 
   const carregarTudo = async () => {
     try {
@@ -990,14 +1043,16 @@ export default function PDVNew() {
     const quantidadeFinal = Number.isFinite(quantidadeEntrada) && quantidadeEntrada > 0 ? quantidadeEntrada : 1;
     const precoCalculado = Number(produto.preco_venda || 0);
     const totalCalculado = totalEntrada > 0 ? totalEntrada : (precoCalculado * quantidadeFinal);
+    const estoqueAtual = Number(produto.estoque_atual || 0);
+    const permiteSemEstoque = Number(produto.permitir_venda_sem_estoque || 0) === 1;
 
-    if (produto.estoque_atual <= 0) {
+    if (!permiteSemEstoque && estoqueAtual <= 0) {
       toast({ title: "Sem estoque", description: produto.nome, variant: "destructive" }); return;
     }
     setCart(prev => {
       const ex = prev.find(i => i.id === produto.id);
       if (ex) {
-        if ((ex.quantidade + quantidadeFinal) > produto.estoque_atual) {
+        if (!permiteSemEstoque && (ex.quantidade + quantidadeFinal) > estoqueAtual) {
           toast({ title: "Estoque insuficiente", variant: "destructive" }); return prev;
         }
         return prev.map(i => i.id === produto.id
@@ -1007,7 +1062,8 @@ export default function PDVNew() {
       return [...prev, {
         id: produto.id, nome: produto.nome,
         preco: precoCalculado, preco_custo: produto.preco_custo || 0,
-        quantidade: Number(quantidadeFinal.toFixed(3)), estoque: produto.estoque_atual,
+        quantidade: Number(quantidadeFinal.toFixed(3)), estoque: estoqueAtual,
+        permitir_venda_sem_estoque: permiteSemEstoque,
         codigo_barras: produto.codigo_barras, total: Number(totalCalculado.toFixed(2)),
       }];
     });
@@ -1017,7 +1073,7 @@ export default function PDVNew() {
     if (qty <= 0) { setCart(prev => prev.filter(i => i.id !== id)); return; }
     setCart(prev => prev.map(i => {
       if (i.id !== id) return i;
-      if (qty > i.estoque) { toast({ title: "Estoque insuficiente", variant: "destructive" }); return i; }
+      if (!i.permitir_venda_sem_estoque && qty > i.estoque) { toast({ title: "Estoque insuficiente", variant: "destructive" }); return i; }
       return { ...i, quantidade: qty, total: i.preco * qty };
     }));
   };
@@ -1048,9 +1104,15 @@ export default function PDVNew() {
     paymentMethod: string; valorRecebido: number;
     descontoAprovado: number; descontoValor: number;
     clienteId: string; cpfNota: string;
+    tipoCupom: "nao_fiscal" | "nfce" | "nfe";
     representanteId?: number;
   }) => {
     if (!caixaAberto || !usuario) return;
+    if (dados.paymentMethod === "fiado" && !dados.clienteId) {
+      toast({ title: "Selecione um cliente para venda no fiado", variant: "destructive" });
+      return;
+    }
+    const paymentDbMethod = dados.paymentMethod === "fiado" ? "crediario" : dados.paymentMethod;
     setLoading(true);
     try {
       const subtotal = cart.reduce((s, i) => s + i.total, 0);
@@ -1068,11 +1130,11 @@ export default function PDVNew() {
           codigo_barras: i.codigo_barras, quantidade: i.quantidade,
           preco_unitario: i.preco, preco_custo: i.preco_custo, total: i.total,
         })),
-        pagamentos: [{ forma: dados.paymentMethod, valor: total }],
+        pagamentos: [{ forma: paymentDbMethod, valor: total }],
         desconto_valor: dados.descontoValor,
         desconto_percentual: dados.descontoAprovado,
         cpf_nota: dados.cpfNota || undefined,
-        tipo_cupom: "nao_fiscal",
+        tipo_cupom: dados.tipoCupom || "nao_fiscal",
       });
 
       // Gera comissão automaticamente se há representante
@@ -1096,15 +1158,77 @@ export default function PDVNew() {
         total, subtotal, troco,
         desconto_valor: dados.descontoValor,
         desconto_percentual: dados.descontoAprovado,
-        forma_pagamento: dados.paymentMethod,
+        forma_pagamento: paymentDbMethod,
         cpf_nota: dados.cpfNota || null,
         cliente_nome: clientes.find(c => c.id.toString() === dados.clienteId)?.nome || null,
         representante_nome: repNome,
         tipo_cupom: dados.tipoCupom || "nao_fiscal",
       };
 
+      // Fiado: lança automaticamente os itens da venda na conta do cliente.
+      // Se o canal novo não existir (ex.: cliente/servidor em versões diferentes),
+      // cai para um fallback que cria a conta de fiado pelo total para não travar o fechamento.
+      if (dados.paymentMethod === "fiado") {
+        const hoje = new Date();
+        const fimMes = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0).toISOString().slice(0, 10);
+        try {
+          await fiadosAPI.lancarVenda({
+            cliente_id: parseInt(dados.clienteId),
+            venda_id: resultado?.id,
+            numero_venda: resultado?.numero,
+            data_vencimento: fimMes,
+            usuario_id: usuario.id,
+            itens: cart.map(i => ({
+              produto_id: i.id,
+              nome_produto: i.nome,
+              quantidade: i.quantidade,
+              preco_unitario: i.preco,
+              total: i.total,
+            })),
+          });
+          toast({ title: "Venda lançada no fiado", description: "Conta do cliente atualizada com os itens da venda." });
+        } catch (erroFiado: any) {
+          try {
+            const contaCriada = await fiadosAPI.criar({
+              cliente_id: parseInt(dados.clienteId),
+              valor: total,
+              data_vencimento: fimMes,
+              venda_id: resultado?.id,
+              descricao: `Fiado da venda ${resultado?.numero || resultado?.id}`,
+              observacoes: `Lançamento automático simplificado. Motivo: ${erroFiado?.message || "canal indisponível"}`,
+            });
+
+            const contaId = Number(contaCriada?.lastInsertRowid || contaCriada?.id || 0);
+            if (contaId > 0) {
+              for (const i of cart) {
+                await fiadosAPI.adicionarItem({
+                  conta_id: contaId,
+                  produto_id: i.id,
+                  nome_item: i.nome,
+                  quantidade: i.quantidade,
+                  valor_unitario: i.preco,
+                  observacoes: `Venda ${resultado?.numero || resultado?.id}`,
+                  usuario_id: usuario.id,
+                });
+              }
+            }
+
+            toast({
+              title: "Venda concluída com fallback de fiado",
+              description: "A conta foi criada no fiado e os itens da venda foram lançados automaticamente.",
+            });
+          } catch (erroFallback: any) {
+            toast({
+              title: "Venda concluída, mas fiado pendente",
+              description: `Não foi possível lançar no fiado automaticamente: ${erroFallback?.message || erroFiado?.message || "erro desconhecido"}`,
+              variant: "destructive",
+            });
+          }
+        }
+      }
+
       // Emissão fiscal (NFC-e ou NF-e)
-      if (dados.tipoCupom && dados.tipoCupom !== "nao_fiscal") {
+      if (dados.paymentMethod !== "fiado" && dados.tipoCupom && dados.tipoCupom !== "nao_fiscal") {
         try {
           const tipoDoc = dados.tipoCupom as "nfe" | "nfce";
           const resultado_fiscal = await emitirNota(vendaParaFinalizar, loja, tipoDoc);
@@ -1138,6 +1262,14 @@ export default function PDVNew() {
         getStatusConexao() === "offline";
 
       if (isNetworkError) {
+        if (dados.paymentMethod === "fiado") {
+          toast({
+            title: "Sem conexão para lançar fiado",
+            description: "Conecte ao servidor para registrar a venda no fiado com os itens corretamente.",
+            variant: "destructive",
+          });
+          return;
+        }
         // Salva na fila offline
         const subtotal = cart.reduce((s, i) => s + i.total, 0);
         const total = subtotal - dados.descontoValor;
@@ -1150,7 +1282,7 @@ export default function PDVNew() {
             codigo_barras: i.codigo_barras, quantidade: i.quantidade,
             preco_unitario: i.preco, preco_custo: i.preco_custo, total: i.total,
           })),
-          pagamentos: [{ forma: dados.paymentMethod, valor: total }],
+          pagamentos: [{ forma: paymentDbMethod, valor: total }],
           desconto_valor: dados.descontoValor,
           desconto_percentual: dados.descontoAprovado,
           cpf_nota: dados.cpfNota || undefined,
@@ -1167,7 +1299,7 @@ export default function PDVNew() {
           troco,
           desconto_valor: dados.descontoValor,
           desconto_percentual: dados.descontoAprovado,
-          forma_pagamento: dados.paymentMethod,
+          forma_pagamento: paymentDbMethod,
           cpf_nota: dados.cpfNota || null,
           cliente_nome: clientes.find(c => c.id.toString() === dados.clienteId)?.nome || null,
           offline: true,
@@ -1251,7 +1383,7 @@ export default function PDVNew() {
                 Caixa #{caixaAberto.id} aberto — {caixaAberto.usuario_nome}
               </div>
               <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                {[["F2","Scanner"],["F4","Finalizar"],["F6","Limpar"],["ESC","Voltar"],["N","Dinheiro"],["C","Crédito"],["D","Débito"],["P","PIX"],["V","Voucher"]].map(([k,l])=>(
+                {[["F2","Scanner"],["F4","Finalizar"],["F6","Limpar"],["F8","Fiados"],["ESC","Voltar"],["N","Dinheiro"],["C","Crédito"],["D","Débito"],["P","PIX"],["V","Voucher"],["F","Fiado"]].map(([k,l])=>(
                   <span key={k} className="flex items-center gap-1">
                     <kbd className="bg-muted border border-border px-1.5 py-0.5 rounded font-mono text-[10px] font-bold">{k}</kbd>
                     <span className="text-muted-foreground">{l}</span>
@@ -1419,6 +1551,14 @@ export default function PDVNew() {
                     <CreditCard className="w-5 h-5" />
                     Ir para Pagamento →
                   </button>
+                  <Button
+                    variant="outline"
+                    className="w-full h-10"
+                    onClick={() => navigate("/fiados")}
+                  >
+                    <Wallet className="w-4 h-4 mr-2" />
+                    Atalho Fiados (F8)
+                  </Button>
                 </>
               )}
             </CardContent>

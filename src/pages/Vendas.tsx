@@ -13,8 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 
 const fmt = (v: number) => "R$ " + Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2});
-const fmtPag = (f: string) => ({"dinheiro":"Dinheiro","credito":"Crédito","debito":"Débito","pix":"PIX","voucher":"Voucher"}[f]||f);
-const iconePag = (f: string): any => ({"dinheiro":Banknote,"credito":CreditCard,"debito":CreditCard,"pix":QrCode,"voucher":Ticket}[f]||CreditCard);
+const fmtPag = (f: string) => ({"dinheiro":"Dinheiro","credito":"Cr�dito","debito":"D�bito","pix":"PIX","voucher":"Voucher","crediario":"Fiado","fiado":"Fiado"}[f]||f);
+const iconePag = (f: string): any => ({"dinheiro":Banknote,"credito":CreditCard,"debito":CreditCard,"pix":QrCode,"voucher":Ticket,"crediario":CreditCard,"fiado":CreditCard}[f]||CreditCard);
 const statusBadge = (s: string): [any,string] => ({"concluida":["default","Concluída"],"cancelada":["destructive","Cancelada"],"pendente":["secondary","Pendente"]}[s]||["secondary",s]) as any;
 
 export default function Vendas() {
@@ -33,6 +33,7 @@ export default function Vendas() {
   const [itens, setItens] = useState<any[]>([]);
   const [pags, setPags] = useState<any[]>([]);
   const [loadDet, setLoadDet] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
 
   useEffect(() => { fetchVendas(); }, []);
 
@@ -78,6 +79,35 @@ ${venda.troco>0?`<div>Troco: R$ ${Number(venda.troco).toFixed(2)}</div>`:""}
 <div class="sep"></div><div class="c">ASTIA PDV by VYN Developer</div>
 <script>window.onload=()=>setTimeout(()=>window.print(),400)</script></body></html>`);
     win.document.close();
+  };
+
+  const cancelarVenda = async () => {
+    if (!venda || !usuario?.id) return;
+    if (venda.status !== "concluida") {
+      toast({ title: "Esta venda já está cancelada", variant: "destructive" });
+      return;
+    }
+
+    const motivo = window.prompt("Informe o motivo do cancelamento:");
+    if (motivo === null) return;
+    const motivoFinal = motivo.trim();
+    if (motivoFinal.length < 3) {
+      toast({ title: "Informe um motivo com pelo menos 3 caracteres", variant: "destructive" });
+      return;
+    }
+    if (!window.confirm(`Confirmar cancelamento da venda ${venda.numero}?`)) return;
+
+    setCancelando(true);
+    try {
+      await vendasAPI.cancelar(venda.id, motivoFinal, usuario.id);
+      toast({ title: "Venda cancelada com sucesso" });
+      setVenda(null);
+      await fetchVendas();
+    } catch (e: any) {
+      toast({ title: "Erro ao cancelar venda", description: e.message, variant: "destructive" });
+    } finally {
+      setCancelando(false);
+    }
   };
 
   const filtered = vendas.filter(v => !search || [v.numero,v.cliente_nome,v.usuario_nome].some(s=>(s||"").toLowerCase().includes(search.toLowerCase())));
@@ -276,6 +306,11 @@ ${venda.troco>0?`<div>Troco: R$ ${Number(venda.troco).toFixed(2)}</div>`:""}
                 <Button variant="outline" className="flex-1" onClick={imprimir}>
                   <Printer className="w-4 h-4 mr-2"/>Segunda via
                 </Button>
+                {isGerente&&venda.status==="concluida"&&(
+                  <Button variant="destructive" className="flex-1" onClick={cancelarVenda} disabled={cancelando}>
+                    {cancelando ? "Cancelando..." : "Cancelar venda"}
+                  </Button>
+                )}
                 {isGerente&&venda.status==="concluida"&&(
                   <Button variant="outline" className="flex-1 text-amber-600 border-amber-300 hover:bg-amber-50"
                     onClick={()=>{setVenda(null);navigate("/trocas");}}>

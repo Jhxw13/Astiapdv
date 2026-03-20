@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { isRestrictedStoreAdmin } from "@/lib/admin-access";
 
 // Permissões por cargo:
 // admin    → tudo
@@ -44,6 +45,7 @@ const menuItems = [
   { title: "Representantes",   url: "/representantes",  icon: UserCheck,       roles: ["admin","gerente"] },
   // ── Financeiro ───────────────────────────────────────────────
   { title: "Financeiro",       url: "/financeiro",      icon: Wallet,          roles: ["admin","gerente"] },
+  { title: "Fiados",           url: "/fiados",          icon: CreditCard,      roles: ["admin","gerente"] },
   { title: "Fechamento Caixa", url: "/fechamento-caixa",icon: ClipboardCheck,  roles: ["admin","gerente"] },
   // ── Relatórios / Utilitários ──────────────────────────────────
   { title: "Relatórios",       url: "/relatorios",      icon: BarChart3,       roles: ["admin","gerente"] },
@@ -83,8 +85,10 @@ export function AppSidebar() {
   const cargo = usuario?.cargo || "vendedor";
   const nome  = usuario?.nome  || "Usuário";
   const ecommerceAtivo = !!config.ecommerce_ativo;
+  const restrictedAdmin = isRestrictedStoreAdmin(usuario);
 
   const filteredItems = menuItems.filter(item => {
+    if (restrictedAdmin) return item.url === "/configuracoes";
     if (!item.roles.includes(cargo)) return false;
     if ((item as any).ecommerce && !ecommerceAtivo) return false;
     return true;

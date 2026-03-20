@@ -15,6 +15,7 @@ import Clientes from "./pages/Clientes";
 import Vendas from "./pages/Vendas";
 import Pedidos from "./pages/Pedidos";
 import Financeiro from "./pages/Financeiro";
+import Fiados from "./pages/Fiados";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import Impressao from "./pages/Impressao";
@@ -30,6 +31,7 @@ import PedidosOnline from "./pages/PedidosOnline";
 import RelatoriosEcommerce from "./pages/RelatoriosEcommerce";
 import ScannerMobile from "./pages/ScannerMobile";
 import Flyers from "./pages/Flyers";
+import { isRestrictedStoreAdmin } from "@/lib/admin-access";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +40,7 @@ function HomeRedirect() {
   if (!usuario) return <Navigate to="/auth" replace />;
   if (usuario.cargo === 'caixa') return <Navigate to="/caixa" replace />;
   if (usuario.cargo === 'vendedor') return <Navigate to="/pdv" replace />;
+  if (isRestrictedStoreAdmin(usuario)) return <Navigate to="/configuracoes" replace />;
   return <Navigate to="/dashboard" replace />;
 }
 
@@ -94,6 +97,11 @@ const App = () => (
                     <Financeiro />
                   </ProtectedRoute>
                 } />
+                <Route path="/fiados" element={
+                  <ProtectedRoute roles={['admin','gerente','vendedor','caixa']}>
+                    <Fiados />
+                  </ProtectedRoute>
+                } />
                 <Route path="/relatorios" element={
                   <ProtectedRoute roles={['admin','gerente']}>
                     <Relatorios />
@@ -110,7 +118,7 @@ const App = () => (
                   </ProtectedRoute>
                 } />
                 <Route path="/trocas" element={
-                  <ProtectedRoute roles={['admin','gerente','vendedor']}>
+                  <ProtectedRoute roles={['admin','gerente','vendedor','caixa']}>
                     <Trocas />
                   </ProtectedRoute>
                 } />
