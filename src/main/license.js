@@ -1,4 +1,4 @@
-const fs = require('fs');
+﻿const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
@@ -62,7 +62,7 @@ function parseSignedLicenseToken(token) {
   const t = String(token || '').trim();
   const parts = t.split('.');
   if (parts.length !== 3 || parts[0] !== 'ASTIA1') {
-    throw new Error('Formato de licença inválido');
+    throw new Error('Formato de licenÃ§a invÃ¡lido');
   }
   const payloadRaw = b64urlToBuffer(parts[1]).toString('utf-8');
   const payload = JSON.parse(payloadRaw);
@@ -70,12 +70,12 @@ function parseSignedLicenseToken(token) {
 }
 
 function verifySignedLicenseToken(token, publicKeyPem) {
-  if (!publicKeyPem) throw new Error('Chave pública de licença não configurada');
+  if (!publicKeyPem) throw new Error('Chave pÃºblica de licenÃ§a nÃ£o configurada');
   const parsed = parseSignedLicenseToken(token);
   const data = Buffer.from(`${parsed.header}.${parsed.payloadPart}`, 'utf-8');
   const sig = b64urlToBuffer(parsed.sigPart);
   const ok = crypto.verify(null, data, publicKeyPem, sig);
-  if (!ok) throw new Error('Assinatura da licença inválida');
+  if (!ok) throw new Error('Assinatura da licenÃ§a invÃ¡lida');
   return parsed.payload;
 }
 
@@ -99,12 +99,40 @@ async function postJSON(baseUrl, paths, payload) {
       lastErr = err;
     }
   }
-  throw lastErr || new Error('Falha ao validar licença');
+  throw lastErr || new Error('Falha ao validar licenÃ§a');
 }
 
 function createLicenseManager({ app, db }) {
   let timer = null;
   let currentStatus = null;
+  const store = (() => {
+    if (db?.licenseStore && typeof db.licenseStore.get === 'function' && typeof db.licenseStore.update === 'function') {
+      return db.licenseStore;
+    }
+    if (db?.configLoja && typeof db.configLoja.get === 'function' && typeof db.configLoja.update === 'function') {
+      return {
+        get: () => {
+          const row = db.configLoja.get() || {};
+          return {
+            licenseKey: row.chave_licenca || '',
+            plan: row.plano || 'basico',
+            validUntil: row.validade_licenca || null,
+            status: row.license_status || 'trial',
+            activatedAt: row.license_activated_at || null,
+            lastCheck: row.license_last_check || null,
+            offlineGraceUntil: row.license_offline_grace_until || null,
+            trialStartedAt: row.license_trial_started_at || row.criado_em || null,
+            deviceId: row.license_device_id || null,
+            customerName: row.license_customer_name || null,
+            serverUrl: row.license_server_url || null,
+            notes: row.license_notes || null,
+          };
+        },
+        update: (data) => db.configLoja.update(data),
+      };
+    }
+    throw new Error('Storage de licenÃ§a indisponÃ­vel: db.licenseStore/configLoja nÃ£o encontrado');
+  })();
 
   function getDeviceId() {
     const file = path.join(app.getPath('userData'), 'license-device.json');
@@ -132,13 +160,13 @@ function createLicenseManager({ app, db }) {
   }
 
   function computeStatus() {
-    const cfg = db.licenseStore.get();
+    const cfg = store.get();
     const now = new Date();
     const nowMs = now.getTime();
 
     const deviceId = cfg.deviceId || getDeviceId();
     if (!cfg.deviceId) {
-      db.licenseStore.update({ license_device_id: deviceId });
+      store.update({ license_device_id: deviceId });
     }
 
     const trialStart = parseDate(cfg.trialStartedAt) || now;
@@ -155,7 +183,7 @@ function createLicenseManager({ app, db }) {
         mode: trialActive ? 'trial' : 'expired',
         status: trialActive ? 'trial' : 'expired',
         accessAllowed: trialActive,
-        reason: trialActive ? 'Período de avaliação ativo' : 'Trial expirado',
+        reason: trialActive ? 'PerÃ­odo de avaliaÃ§Ã£o ativo' : 'Trial expirado',
         deviceId,
         plan: cfg.plan || 'trial',
         validUntil: toISO(trialUntil),
@@ -171,7 +199,7 @@ function createLicenseManager({ app, db }) {
         mode: 'licensed',
         status: 'active',
         accessAllowed: true,
-        reason: 'Licença lifetime ativa',
+        reason: 'LicenÃ§a lifetime ativa',
         deviceId,
         plan: 'lifetime',
         validUntil: null,
@@ -185,7 +213,7 @@ function createLicenseManager({ app, db }) {
         mode: 'blocked',
         status,
         accessAllowed: false,
-        reason: 'Licença bloqueada',
+        reason: 'LicenÃ§a bloqueada',
         deviceId,
         plan: cfg.plan || 'pro',
         validUntil: cfg.validUntil || null,
@@ -199,7 +227,7 @@ function createLicenseManager({ app, db }) {
         mode: 'licensed',
         status: 'active',
         accessAllowed: true,
-        reason: 'Licença ativa',
+        reason: 'LicenÃ§a ativa',
         deviceId,
         plan: cfg.plan || 'pro',
         validUntil: toISO(validUntil),
@@ -213,7 +241,7 @@ function createLicenseManager({ app, db }) {
         mode: 'offline_grace',
         status: 'offline_grace',
         accessAllowed: true,
-        reason: 'Sem validação recente, usando tolerância offline',
+        reason: 'Sem validaÃ§Ã£o recente, usando tolerÃ¢ncia offline',
         deviceId,
         plan: cfg.plan || 'pro',
         validUntil: cfg.validUntil || null,
@@ -227,7 +255,7 @@ function createLicenseManager({ app, db }) {
       mode: 'expired',
       status: 'expired',
       accessAllowed: false,
-      reason: 'Licença expirada',
+      reason: 'LicenÃ§a expirada',
       deviceId,
       plan: cfg.plan || 'pro',
       validUntil: cfg.validUntil || null,
@@ -244,7 +272,7 @@ function createLicenseManager({ app, db }) {
   function persistServerResponse(payload, serverUrl, keyUsed) {
     const now = new Date();
     const offlineGraceUntil = addDays(now, payload.offlineGraceDays || OFFLINE_GRACE_DAYS_DEFAULT);
-    db.licenseStore.update({
+    store.update({
       chave_licenca: keyUsed,
       plano: payload.plan || 'pro',
       validade_licenca: payload.validUntil || null,
@@ -261,11 +289,11 @@ function createLicenseManager({ app, db }) {
 
   async function activate({ licenseKey, serverUrl }) {
     const key = String(licenseKey || '').trim();
-    if (!key) throw new Error('Informe a chave da licença');
+    if (!key) throw new Error('Informe a chave da licenÃ§a');
 
     const deviceId = getDeviceId();
 
-    // 1) Primeiro tenta licença local offline assinada
+    // 1) Primeiro tenta licenÃ§a local offline assinada
     try {
       const payload = verifySignedLicenseToken(key, DEFAULT_PUBLIC_KEY_PEM);
       const licenseId = String(payload.id || payload.licenseId || '').trim();
@@ -275,22 +303,22 @@ function createLicenseManager({ app, db }) {
       const status = String(payload.status || 'active').toLowerCase();
 
       if (licenseId && REVOKED_IDS.has(licenseId)) {
-        throw new Error('Licença revogada');
+        throw new Error('LicenÃ§a revogada');
       }
       if (boundDeviceId && boundDeviceId !== deviceId) {
-        throw new Error(`Licença vinculada a outro dispositivo (${boundDeviceId})`);
+        throw new Error(`LicenÃ§a vinculada a outro dispositivo (${boundDeviceId})`);
       }
       if (status === 'revoked' || status === 'blocked') {
-        throw new Error('Licença bloqueada');
+        throw new Error('LicenÃ§a bloqueada');
       }
       if (plan !== 'lifetime' && validUntil) {
         const d = parseDate(validUntil);
         if (!d || d.getTime() < Date.now()) {
-          throw new Error('Licença expirada');
+          throw new Error('LicenÃ§a expirada');
         }
       }
 
-      db.licenseStore.update({
+      store.update({
         chave_licenca: key,
         plano: plan || 'pro',
         validade_licenca: plan === 'lifetime' ? null : validUntil,
@@ -300,13 +328,13 @@ function createLicenseManager({ app, db }) {
         license_activated_at: toISO(new Date()),
         license_customer_name: payload.customer || payload.customerName || null,
         license_server_url: null,
-        license_notes: payload.notes || 'Licença ativada localmente',
+        license_notes: payload.notes || 'LicenÃ§a ativada localmente',
         license_device_id: deviceId,
       });
       return getStatus();
     } catch (localErr) {
-      // Continua para validação online opcional, se houver servidor.
-      const finalServerUrl = String(serverUrl || process.env.LICENSE_SERVER_URL || db.licenseStore.get().serverUrl || '').trim();
+      // Continua para validaÃ§Ã£o online opcional, se houver servidor.
+      const finalServerUrl = String(serverUrl || process.env.LICENSE_SERVER_URL || store.get().serverUrl || '').trim();
       if (!finalServerUrl) {
         throw localErr;
       }
@@ -327,10 +355,10 @@ function createLicenseManager({ app, db }) {
   }
 
   async function verifyNow() {
-    const cfg = db.licenseStore.get();
+    const cfg = store.get();
     if (!cfg.licenseKey) return getStatus();
 
-    // 1) Licença offline assinada (sem custo de servidor)
+    // 1) LicenÃ§a offline assinada (sem custo de servidor)
     try {
       const payload = verifySignedLicenseToken(cfg.licenseKey, DEFAULT_PUBLIC_KEY_PEM);
       const licenseId = String(payload.id || payload.licenseId || '').trim();
@@ -339,14 +367,14 @@ function createLicenseManager({ app, db }) {
       const boundDeviceId = payload.deviceId || payload.device_id || null;
       const deviceId = getDeviceId();
 
-      if (licenseId && REVOKED_IDS.has(licenseId)) throw new Error('Licença revogada');
-      if (boundDeviceId && boundDeviceId !== deviceId) throw new Error('Licença vinculada a outro dispositivo');
+      if (licenseId && REVOKED_IDS.has(licenseId)) throw new Error('LicenÃ§a revogada');
+      if (boundDeviceId && boundDeviceId !== deviceId) throw new Error('LicenÃ§a vinculada a outro dispositivo');
       if (plan !== 'lifetime' && validUntil) {
         const d = parseDate(validUntil);
-        if (!d || d.getTime() < Date.now()) throw new Error('Licença expirada');
+        if (!d || d.getTime() < Date.now()) throw new Error('LicenÃ§a expirada');
       }
 
-      db.licenseStore.update({
+      store.update({
         plano: plan || 'pro',
         validade_licenca: plan === 'lifetime' ? null : validUntil,
         license_status: 'active',
@@ -358,9 +386,9 @@ function createLicenseManager({ app, db }) {
     } catch (localErr) {
       const serverUrl = String(cfg.serverUrl || process.env.LICENSE_SERVER_URL || '').trim();
       if (!serverUrl) {
-        db.licenseStore.update({
+        store.update({
           license_status: 'blocked',
-          license_notes: `Licença inválida: ${localErr.message}`,
+          license_notes: `LicenÃ§a invÃ¡lida: ${localErr.message}`,
           license_last_check: toISO(new Date()),
         });
         return getStatus();
@@ -380,10 +408,10 @@ function createLicenseManager({ app, db }) {
       persistServerResponse(normalized, serverUrl, cfg.licenseKey);
       return getStatus();
     } catch (err) {
-      // Se falhar validação remota, ativa tolerância offline.
-      db.licenseStore.update({
+      // Se falhar validaÃ§Ã£o remota, ativa tolerÃ¢ncia offline.
+      store.update({
         license_status: 'offline_grace',
-        license_notes: `Falha de validação: ${err.message}`,
+        license_notes: `Falha de validaÃ§Ã£o: ${err.message}`,
         license_last_check: toISO(new Date()),
         license_offline_grace_until: toISO(addDays(new Date(), OFFLINE_GRACE_DAYS_DEFAULT)),
       });
@@ -410,7 +438,7 @@ function createLicenseManager({ app, db }) {
   }
 
   function clearLicense() {
-    db.licenseStore.update({
+    store.update({
       chave_licenca: '',
       plano: 'basico',
       validade_licenca: null,
@@ -436,3 +464,4 @@ function createLicenseManager({ app, db }) {
 }
 
 module.exports = { createLicenseManager };
+

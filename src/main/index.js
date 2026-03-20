@@ -1,5 +1,5 @@
-/**
- * VYN CRM — Main Process v6.0
+﻿/**
+ * VYN CRM â€” Main Process v6.0
  * Corrigido: tela cinza em IP local, base '/' no vite, serve SPA corretamente
  */
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require('electron');
@@ -24,9 +24,9 @@ let mainWindow = null, httpServer = null, db = null;
 let licenseManager = null;
 const pendingApprovals = new Map();
 
-// ── Cloudflare Tunnel (Quick Tunnel — sem conta, grátis) ──────────────────
+// â”€â”€ Cloudflare Tunnel (Quick Tunnel â€” sem conta, grÃ¡tis) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 let tunnelProcess  = null;
-let tunnelURL      = null;   // URL pública atual
+let tunnelURL      = null;   // URL pÃºblica atual
 let tunnelStatus   = 'off';  // off | starting | active | error
 let tunnelLog      = [];
 
@@ -47,7 +47,7 @@ async function downloadCloudflared() {
   const plat = process.platform;
   const arch = process.arch === 'arm64' ? 'arm64' : 'x64';
   const url  = CLOUDFLARED_URLS[plat]?.[arch];
-  if (!url) throw new Error(`Plataforma não suportada: ${plat}/${arch}`);
+  if (!url) throw new Error(`Plataforma nÃ£o suportada: ${plat}/${arch}`);
 
   const dest = getCloudflaredPath();
   tunnelLog.push(`Baixando cloudflared para ${plat}/${arch}...`);
@@ -63,7 +63,7 @@ async function downloadCloudflared() {
         }
         if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
 
-        // Para .tgz no macOS, precisaria extrair — por ora, só Linux/Win
+        // Para .tgz no macOS, precisaria extrair â€” por ora, sÃ³ Linux/Win
         const out = fs.createWriteStream(dest);
         res.pipe(out);
         out.on('finish', () => {
@@ -71,7 +71,7 @@ async function downloadCloudflared() {
           if (process.platform !== 'win32') {
             fs.chmodSync(dest, 0o755);
           }
-          tunnelLog.push('Download concluído.');
+          tunnelLog.push('Download concluÃ­do.');
           notifyTunnel();
           resolve(dest);
         });
@@ -92,11 +92,11 @@ function notifyTunnel() {
 
 async function startTunnel() {
   if (IS_CLIENT) return;
-  if (tunnelProcess) return; // já rodando
+  if (tunnelProcess) return; // jÃ¡ rodando
 
   tunnelStatus = 'starting';
   tunnelURL    = null;
-  tunnelLog    = ['Iniciando túnel Cloudflare...'];
+  tunnelLog    = ['Iniciando tÃºnel Cloudflare...'];
   notifyTunnel();
 
   try {
@@ -119,7 +119,7 @@ async function startTunnel() {
       if (match && !tunnelURL) {
         tunnelURL   = match[0];
         tunnelStatus = 'active';
-        tunnelLog.push(`✅ Túnel ativo: ${tunnelURL}`);
+        tunnelLog.push(`âœ… TÃºnel ativo: ${tunnelURL}`);
         // Salva no banco para o prompt do GPT Maker usar
         try { db?.configLoja?.set?.('tunnel_url', tunnelURL); } catch {}
       }
@@ -133,7 +133,7 @@ async function startTunnel() {
       tunnelProcess = null;
       tunnelURL     = null;
       tunnelStatus  = code === 0 ? 'off' : 'error';
-      tunnelLog.push(code === 0 ? 'Túnel encerrado.' : `Túnel encerrado com erro (código ${code})`);
+      tunnelLog.push(code === 0 ? 'TÃºnel encerrado.' : `TÃºnel encerrado com erro (cÃ³digo ${code})`);
       notifyTunnel();
     });
 
@@ -145,7 +145,7 @@ async function startTunnel() {
 
   } catch (err) {
     tunnelStatus = 'error';
-    tunnelLog.push(`Erro ao iniciar túnel: ${err.message}`);
+    tunnelLog.push(`Erro ao iniciar tÃºnel: ${err.message}`);
     notifyTunnel();
   }
 }
@@ -157,7 +157,7 @@ function stopTunnel() {
   }
   tunnelURL    = null;
   tunnelStatus = 'off';
-  tunnelLog.push('Túnel desativado.');
+  tunnelLog.push('TÃºnel desativado.');
   notifyTunnel();
 }
 
@@ -183,7 +183,7 @@ function getLocalIP() {
     if (/vmware|virtualbox|vethernet|docker|wsl|loopback/i.test(name)) continue;
     for (const i of ifaces[name]) {
       if (i.family === 'IPv4' && !i.internal) {
-        // Prioriza faixas de rede local típicas
+        // Prioriza faixas de rede local tÃ­picas
         if (i.address.startsWith('192.168.') || i.address.startsWith('10.') || i.address.startsWith('172.')) {
           candidates.unshift(i.address); // maior prioridade
         } else {
@@ -195,7 +195,7 @@ function getLocalIP() {
   return candidates[0] || '127.0.0.1';
 }
 
-// ── Dispatcher de canais do banco ─────────────────────────────────────────────
+// â”€â”€ Dispatcher de canais do banco â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function handleDBCall(channel, data) {
   if (!db) throw new Error('Banco nao inicializado');
   const h = {
@@ -284,31 +284,31 @@ function handleDBCall(channel, data) {
     'trocas:usar-credito':        () => db.trocas.usarCredito(data.credito_id, data.valor_usar, data.venda_id),
     'trocas:buscar-voucher':      () => db.trocas.buscarVoucher(data),
     'trocas:usar-voucher':        () => db.trocas.usarVoucher(data.codigo, data.valor_usar, data.venda_id),
-    // ── Fornecedores ──────────────────────────────────────────────────────────
+    // â”€â”€ Fornecedores â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'fornecedores:listar':        () => db.fornecedores.listar(data),
     'fornecedores:buscar-id':     () => db.fornecedores.buscarPorId(data),
     'fornecedores:criar':         () => db.fornecedores.criar(data),
     'fornecedores:atualizar':     () => db.fornecedores.atualizar(data.id, data),
     'fornecedores:deletar':       () => db.fornecedores.deletar(data),
-    // ── Compras ───────────────────────────────────────────────────────────────
+    // â”€â”€ Compras â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'compras:listar':             () => db.compras.listar(data),
     'compras:buscar':             () => db.compras.buscar(data),
     'compras:itens':              () => db.compras.itens(data),
     'compras:criar':              () => db.compras.criar(data),
     'compras:cancelar':           () => db.compras.cancelar(data.id, data.motivo, data.usuario_id),
     'compras:resumo':             () => db.compras.resumo(data?.inicio, data?.fim),
-    // ── Representantes ────────────────────────────────────────────────────────
+    // â”€â”€ Representantes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'representantes:listar':      () => db.representantes.listar(data),
     'representantes:buscar-id':   () => db.representantes.buscarPorId(data),
     'representantes:criar':       () => db.representantes.criar(data),
     'representantes:atualizar':   () => db.representantes.atualizar(data.id, data),
     'representantes:deletar':     () => db.representantes.deletar(data),
-    // ── Comissões ─────────────────────────────────────────────────────────────
+    // â”€â”€ ComissÃµes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'comissoes:gerar':            () => db.comissoes.gerarParaVenda(data.venda_id, data.representante_id),
     'comissoes:listar':           () => db.comissoes.listar(data),
     'comissoes:pagar':            () => db.comissoes.pagar(data.ids, data.data_pagamento),
     'comissoes:resumo':           () => db.comissoes.resumoPorRepresentante(data?.inicio, data?.fim),
-    // ── E-commerce (pedidos online — SEPARADO do PDV) ─────────────────────────
+    // â”€â”€ E-commerce (pedidos online â€” SEPARADO do PDV) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'ecommerce:pedidos-listar':     () => db.pedidosOnline.listar(data),
     'ecommerce:pedido-buscar':      () => db.pedidosOnline.buscar(data),
     'ecommerce:pedido-itens':       () => db.pedidosOnline.itens(data),
@@ -317,7 +317,7 @@ function handleDBCall(channel, data) {
     'ecommerce:relatorio':          () => db.pedidosOnline.relatorio(data?.inicio, data?.fim),
     'ecommerce:produtos-online':    () => db.pedidosOnline.produtosOnline(data),
     'ecommerce:marcar-produto':     () => db.pedidosOnline.marcarProduto(data.produto_id, data),
-    // ── Flyers & Promoções ────────────────────────────────────────────────────
+    // â”€â”€ Flyers & PromoÃ§Ãµes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     'flyers:perto-validade':  () => db.flyers.perto_validade(data?.dias ?? 7),
     'flyers:estoque-alto':    () => db.flyers.estoque_alto(data?.minimo ?? 20),
     'flyers:buscar-produtos': () => db.flyers.buscar(data?.busca ?? ''),
@@ -343,11 +343,11 @@ function assertLicenseForChannel(channel) {
   if (isLicenseFreeChannel(channel)) return;
   const st = licenseManager.getStatus();
   if (!st.accessAllowed) {
-    throw new Error(`LICENCA_BLOQUEADA: ${st.reason || 'Licença inativa'}`);
+    throw new Error(`LICENCA_BLOQUEADA: ${st.reason || 'LicenÃ§a inativa'}`);
   }
 }
 
-// ── Servidor HTTP ─────────────────────────────────────────────────────────────
+// â”€â”€ Servidor HTTP â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function startHTTPServer() {
   const PORT = 3567;
   const MIME = {
@@ -365,14 +365,14 @@ function startHTTPServer() {
     res.setHeader('Access-Control-Allow-Headers','Content-Type');
     if (req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
 
-    // ── /ping ──────────────────────────────────────────────────────────────────
+    // â”€â”€ /ping â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url==='/ping'){
       res.writeHead(200,{'Content-Type':'application/json'});
       res.end(JSON.stringify({ok:true,ip:getLocalIP(),version:'6.0'}));
       return;
     }
 
-    // ── /api/scanner — recebe código lido pelo celular ────────────────────────
+    // â”€â”€ /api/scanner â€” recebe cÃ³digo lido pelo celular â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url==='/api/scanner' && req.method==='POST'){
       let body='';
       req.on('data',c=>{body+=c;});
@@ -392,8 +392,8 @@ function startHTTPServer() {
       return;
     }
 
-    // ── /scanner — página standalone do scanner mobile ────────────────────────
-    // Serve HTML puro com câmera. Headers especiais permitem camera em HTTP local.
+    // â”€â”€ /scanner â€” pÃ¡gina standalone do scanner mobile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Serve HTML puro com cÃ¢mera. Headers especiais permitem camera em HTTP local.
     if (req.url==='/scanner' || req.url==='/scanner/'){
       const serverIp = getLocalIP();
       const lojaNome = (() => { try { return db?.configLoja?.get?.()?.nome || 'ASTIA PDV'; } catch { return 'ASTIA PDV'; } })();
@@ -404,7 +404,7 @@ function startHTTPServer() {
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
-<title>Scanner — ${lojaNome}</title>
+<title>Scanner â€” ${lojaNome}</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{background:#0a0a0a;color:#f0f0f0;font-family:system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;}
@@ -450,8 +450,8 @@ h1 span{color:#7c5cfc;}
 <h1>ASTIA <span>Scanner</span></h1>
 
 <div class="modos">
-  <button class="modo-btn ativo" id="btn-consulta" onclick="setModo('consulta')">🔍 Consulta de Preço</button>
-  <button class="modo-btn" id="btn-pdv" onclick="setModo('pdv')">🛒 Enviar para PDV</button>
+  <button class="modo-btn ativo" id="btn-consulta" onclick="setModo('consulta')">ðŸ” Consulta de PreÃ§o</button>
+  <button class="modo-btn" id="btn-pdv" onclick="setModo('pdv')">ðŸ›’ Enviar para PDV</button>
 </div>
 
 <div id="viewport" style="display:none">
@@ -467,21 +467,21 @@ h1 span{color:#7c5cfc;}
   <div id="res-msg"></div>
 </div>
 
-<button id="btn-camera" onclick="toggleCamera()">📷 Ativar Scanner</button>
+<button id="btn-camera" onclick="toggleCamera()">ðŸ“· Ativar Scanner</button>
 <div id="status"></div>
 
 <div id="permissao-aviso">
-  <h3>⚠️ Câmera bloqueada</h3>
-  <p>Seu navegador bloqueou o acesso à câmera. Para resolver:</p>
+  <h3>âš ï¸ CÃ¢mera bloqueada</h3>
+  <p>Seu navegador bloqueou o acesso Ã  cÃ¢mera. Para resolver:</p>
   <ol>
-    <li>Toque no ícone de cadeado/câmera na barra do navegador</li>
-    <li>Selecione <strong>"Permitir"</strong> para câmera</li>
-    <li>Recarregue a página</li>
+    <li>Toque no Ã­cone de cadeado/cÃ¢mera na barra do navegador</li>
+    <li>Selecione <strong>"Permitir"</strong> para cÃ¢mera</li>
+    <li>Recarregue a pÃ¡gina</li>
   </ol>
-  <p style="margin-top:8px;font-size:12px;color:#555">Ou acesse pelo Chrome e permita câmera quando solicitado.</p>
+  <p style="margin-top:8px;font-size:12px;color:#555">Ou acesse pelo Chrome e permita cÃ¢mera quando solicitado.</p>
 </div>
 
-<div id="historico" style="display:none"><h3>Últimas leituras</h3><div id="hist-lista"></div></div>
+<div id="historico" style="display:none"><h3>Ãšltimas leituras</h3><div id="hist-lista"></div></div>
 
 <script>
 const SERVER = 'http://${serverIp}:3567';
@@ -497,7 +497,7 @@ function setModo(m) {
   modo = m;
   document.getElementById('btn-consulta').className = 'modo-btn' + (m==='consulta'?' ativo':'');
   document.getElementById('btn-pdv').className = 'modo-btn' + (m==='pdv'?' ativo':'');
-  setStatus(m==='pdv' ? '📡 Modo PDV: código enviado ao computador' : '🔍 Modo Consulta: veja o preço na tela');
+  setStatus(m==='pdv' ? 'ðŸ“¡ Modo PDV: cÃ³digo enviado ao computador' : 'ðŸ” Modo Consulta: veja o preÃ§o na tela');
 }
 
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
@@ -510,24 +510,24 @@ async function toggleCamera() {
 async function iniciarCamera() {
   const btn = document.getElementById('btn-camera');
   btn.disabled = true;
-  btn.textContent = 'Abrindo câmera...';
+  btn.textContent = 'Abrindo cÃ¢mera...';
   setStatus('');
   document.getElementById('permissao-aviso').style.display = 'none';
 
   try {
-    // Tenta câmera traseira primeiro
+    // Tenta cÃ¢mera traseira primeiro
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
     });
   } catch(e1) {
     try {
-      // Fallback: qualquer câmera
+      // Fallback: qualquer cÃ¢mera
       stream = await navigator.mediaDevices.getUserMedia({ video: true });
     } catch(e2) {
       btn.disabled = false;
-      btn.textContent = '📷 Tentar novamente';
+      btn.textContent = 'ðŸ“· Tentar novamente';
       document.getElementById('permissao-aviso').style.display = 'block';
-      setStatus('❌ Sem acesso à câmera — veja as instruções abaixo');
+      setStatus('âŒ Sem acesso Ã  cÃ¢mera â€” veja as instruÃ§Ãµes abaixo');
       return;
     }
   }
@@ -537,12 +537,12 @@ async function iniciarCamera() {
   await video.play();
   document.getElementById('viewport').style.display = 'block';
   btn.disabled = false;
-  btn.textContent = '⏹ Parar Scanner';
-  setStatus('📷 Scanner ativo — aponte para o código');
+  btn.textContent = 'â¹ Parar Scanner';
+  setStatus('ðŸ“· Scanner ativo â€” aponte para o cÃ³digo');
   scanning = true;
   iniciarScan();
 
-  // Solicita vibração para confirmar que está ativo
+  // Solicita vibraÃ§Ã£o para confirmar que estÃ¡ ativo
   navigator.vibrate && navigator.vibrate(50);
 }
 
@@ -552,7 +552,7 @@ function pararCamera() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   document.getElementById('viewport').style.display = 'none';
   const btn = document.getElementById('btn-camera');
-  btn.textContent = '📷 Ativar Scanner';
+  btn.textContent = 'ðŸ“· Ativar Scanner';
   setStatus('');
 }
 
@@ -609,7 +609,7 @@ async function processarCodigo(codigo) {
   document.getElementById('res-nome').textContent = 'Buscando...';
   document.getElementById('res-preco').textContent = '';
   document.getElementById('res-msg').textContent = '';
-  setStatus('🔍 Buscando produto...');
+  setStatus('ðŸ” Buscando produto...');
 
   try {
     // Busca produto no servidor
@@ -628,9 +628,9 @@ async function processarCodigo(codigo) {
         ? produto.preco_promocional : produto.preco_venda;
       document.getElementById('res-preco').textContent = 'R$ ' + Number(preco).toFixed(2).replace('.', ',');
       document.getElementById('res-msg').textContent = '';
-      setStatus('✅ ' + produto.nome);
+      setStatus('âœ… ' + produto.nome);
       
-      // Adiciona ao histórico
+      // Adiciona ao histÃ³rico
       historico.unshift({ codigo, nome: produto.nome, preco });
       if (historico.length > 8) historico.pop();
       renderHistorico();
@@ -641,23 +641,23 @@ async function processarCodigo(codigo) {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ codigo, produto_id: produto.id })
         });
-        setStatus('📡 Enviado para o PDV: ' + produto.nome);
+        setStatus('ðŸ“¡ Enviado para o PDV: ' + produto.nome);
       }
     } else {
       divRes.className = 'erro';
       document.getElementById('res-nome').textContent = '';
       document.getElementById('res-preco').textContent = '';
-      document.getElementById('res-msg').textContent = 'Produto não encontrado';
-      setStatus('❌ Código não encontrado: ' + codigo);
+      document.getElementById('res-msg').textContent = 'Produto nÃ£o encontrado';
+      setStatus('âŒ CÃ³digo nÃ£o encontrado: ' + codigo);
       navigator.vibrate && navigator.vibrate([100, 50, 100]);
     }
   } catch(e) {
     divRes.className = 'erro';
-    document.getElementById('res-msg').textContent = 'Erro de conexão com o servidor';
-    setStatus('❌ Erro de conexão');
+    document.getElementById('res-msg').textContent = 'Erro de conexÃ£o com o servidor';
+    setStatus('âŒ Erro de conexÃ£o');
   }
 
-  // Retoma scan após 2.5s
+  // Retoma scan apÃ³s 2.5s
   setTimeout(() => {
     if (stream) { scanning = true; iniciarScan(); }
   }, 2500);
@@ -683,11 +683,11 @@ function renderHistorico() {
   document.head.appendChild(s);
 })();
 
-// Verifica se câmera está disponível
+// Verifica se cÃ¢mera estÃ¡ disponÃ­vel
 window.addEventListener('load', () => {
   if (!navigator.mediaDevices?.getUserMedia) {
     document.getElementById('btn-camera').disabled = true;
-    document.getElementById('btn-camera').textContent = '❌ Câmera não suportada neste navegador';
+    document.getElementById('btn-camera').textContent = 'âŒ CÃ¢mera nÃ£o suportada neste navegador';
     document.getElementById('permissao-aviso').style.display = 'block';
   }
 });
@@ -695,7 +695,7 @@ window.addEventListener('load', () => {
 </body>
 </html>`;
 
-      // Headers especiais que permitem câmera em HTTP local
+      // Headers especiais que permitem cÃ¢mera em HTTP local
       res.writeHead(200, {
         'Content-Type': 'text/html;charset=utf-8',
         'Cross-Origin-Opener-Policy': 'same-origin',
@@ -708,7 +708,7 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── /api/logo (serve logo da loja para clientes na rede) ──────────────────
+    // â”€â”€ /api/logo (serve logo da loja para clientes na rede) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url==='/api/logo'){
       try {
         const cfg = db?.configLoja?.get?.() || {};
@@ -731,7 +731,7 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── /api (chamadas ao banco) ────────────────────────────────────────────────
+    // â”€â”€ /api (chamadas ao banco) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url==='/api' && req.method==='POST'){
       let body='';
       req.on('data',c=>{body+=c;});
@@ -750,7 +750,7 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── /api/license/status ────────────────────────────────────────────────────
+    // â”€â”€ /api/license/status â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url === '/api/license/status' && req.method === 'GET') {
       const st = licenseManager?.getStatus?.() || { accessAllowed: true, status: 'unknown' };
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -758,14 +758,14 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── /api/license/activate ─────────────────────────────────────────────────
+    // â”€â”€ /api/license/activate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url === '/api/license/activate' && req.method === 'POST') {
       let body = '';
       req.on('data', c => { body += c; });
       req.on('end', async () => {
         try {
           const { licenseKey, serverUrl } = JSON.parse(body || '{}');
-          if (!licenseManager) throw new Error('Licenciamento indisponível');
+          if (!licenseManager) throw new Error('Licenciamento indisponÃ­vel');
           const st = await licenseManager.activate({ licenseKey, serverUrl });
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, result: st }));
@@ -777,13 +777,13 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── /api/license/verify ───────────────────────────────────────────────────
+    // â”€â”€ /api/license/verify â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url === '/api/license/verify' && req.method === 'POST') {
       let body = '';
       req.on('data', c => { body += c; });
       req.on('end', async () => {
         try {
-          if (!licenseManager) throw new Error('Licenciamento indisponível');
+          if (!licenseManager) throw new Error('Licenciamento indisponÃ­vel');
           const st = await licenseManager.verifyNow();
           res.writeHead(200, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ ok: true, result: st }));
@@ -795,7 +795,7 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── /api/liberacao (autorização via QR) ────────────────────────────────────
+    // â”€â”€ /api/liberacao (autorizaÃ§Ã£o via QR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url==='/api/liberacao/criar' && req.method==='POST'){
       let body='';
       req.on('data',c=>{body+=c;});
@@ -816,7 +816,7 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // Lista todas as solicitações pendentes (gerente usa para ver no sistema)
+    // Lista todas as solicitaÃ§Ãµes pendentes (gerente usa para ver no sistema)
     if (req.url==='/api/liberacao/pendentes' && req.method==='GET'){
       const agora = Date.now();
       const lista = [];
@@ -837,7 +837,7 @@ window.addEventListener('load', () => {
         try{
           const {token, nomeGerente} = JSON.parse(body);
           const p = pendingApprovals.get(token);
-          if(!p){ res.writeHead(200,{'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Token não encontrado ou expirado'})); return; }
+          if(!p){ res.writeHead(200,{'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Token nÃ£o encontrado ou expirado'})); return; }
           if(Date.now()>p.expira){ pendingApprovals.delete(token); res.writeHead(200,{'Content-Type':'application/json'}); res.end(JSON.stringify({ok:false,error:'Token expirado'})); return; }
           p.status='aprovado';
           p.usuario=nomeGerente||'Gerente';
@@ -887,7 +887,7 @@ window.addEventListener('load', () => {
       return;
     }
 
-    // ── /liberar (página de autorização para o gerente) ────────────────────────
+    // â”€â”€ /liberar (pÃ¡gina de autorizaÃ§Ã£o para o gerente) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (req.url.startsWith('/liberar')){
       let token='';
       try{token=new URL('http://x'+req.url).searchParams.get('token')||'';}catch{}
@@ -920,12 +920,12 @@ catch(e){msg.innerHTML='<div class="err">Erro de conexao</div>';btn.disabled=fal
       return;
     }
 
-    // ── Arquivos estáticos + SPA fallback ──────────────────────────────────────
+    // â”€â”€ Arquivos estÃ¡ticos + SPA fallback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const distPath = getDistPath();
     let urlPath = req.url.split('?')[0].replace(/\/+/g,'/');
     if (urlPath.includes('..')){res.writeHead(400);res.end('Bad request');return;}
 
-    // Rotas do SPA (sem extensão) → sempre servir index.html
+    // Rotas do SPA (sem extensÃ£o) â†’ sempre servir index.html
     const ext = path.extname(urlPath).toLowerCase();
     const isAsset = ext && ext !== '.html';
 
@@ -939,20 +939,20 @@ catch(e){msg.innerHTML='<div class="err">Erro de conexao</div>';btn.disabled=fal
     if (fs.existsSync(filePath) && !fs.statSync(filePath).isDirectory()){
       const fileExt = path.extname(filePath).toLowerCase();
       const mimeType = MIME[fileExt] || 'application/octet-stream';
-      // Assets JS/CSS têm cache longo; HTML nunca tem cache (SPA)
+      // Assets JS/CSS tÃªm cache longo; HTML nunca tem cache (SPA)
       const cacheControl = fileExt === '.html' ? 'no-cache, no-store, must-revalidate' : 'public, max-age=31536000, immutable';
       res.writeHead(200, { 'Content-Type': mimeType, 'Cache-Control': cacheControl });
       fs.createReadStream(filePath).pipe(res);
     } else {
-      // dist não foi gerado ainda
+      // dist nÃ£o foi gerado ainda
       res.writeHead(503,{'Content-Type':'text/html;charset=utf-8'});
       res.end(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>VYN CRM</title>
 <style>body{font-family:monospace;background:#0f172a;color:#f1f5f9;padding:40px;margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh}
 .card{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:32px;max-width:500px;width:100%}
 h2{color:#f87171;margin-bottom:12px}pre{background:#0f172a;padding:12px;border-radius:8px;margin-top:8px;font-size:13px;color:#94a3b8}
 p{color:#94a3b8;margin-bottom:8px}</style></head><body><div class="card">
-<h2>⚙️ Build pendente</h2>
-<p>O frontend ainda não foi compilado. Execute no terminal:</p>
+<h2>âš™ï¸ Build pendente</h2>
+<p>O frontend ainda nÃ£o foi compilado. Execute no terminal:</p>
 <pre>cd pasta_do_projeto
 npm install
 npm run rebuild
@@ -965,7 +965,7 @@ npm start</pre>
 
   httpServer.on('error', err => {
     console.error('[VYN] Erro HTTP:', err.message);
-    if(err.code==='EADDRINUSE') dialog.showErrorBox('Porta em uso', 'A porta 3567 já está em uso.\nFeche outra instância do VYN CRM e tente novamente.');
+    if(err.code==='EADDRINUSE') dialog.showErrorBox('Porta em uso', 'A porta 3567 jÃ¡ estÃ¡ em uso.\nFeche outra instÃ¢ncia do VYN CRM e tente novamente.');
   });
 
   httpServer.listen(PORT, '0.0.0.0', () => {
@@ -975,14 +975,14 @@ npm start</pre>
   });
 }
 
-// ── Janela Electron ───────────────────────────────────────────────────────────
-// ── Cliente: varredura de rede no processo principal ─────────────────────────
+// â”€â”€ Janela Electron â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Cliente: varredura de rede no processo principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 async function descobrirServidor() {
   const http = require('http');
   const os   = require('os');
 
-  // Pega todos os prefixos de rede local desta máquina
+  // Pega todos os prefixos de rede local desta mÃ¡quina
   const prefixes = new Set();
   Object.values(os.networkInterfaces()).flat().forEach(iface => {
     if (iface && iface.family === 'IPv4' && !iface.internal) {
@@ -990,7 +990,7 @@ async function descobrirServidor() {
       prefixes.add(parts.slice(0,3).join('.'));
     }
   });
-  // Fallback se não achou nenhum
+  // Fallback se nÃ£o achou nenhum
   if (prefixes.size === 0) ['192.168.1','192.168.0','10.0.0'].forEach(p => prefixes.add(p));
 
   // Testa um IP na porta 3567 com timeout de 800ms
@@ -1032,7 +1032,7 @@ function mostrarTelaConexao() {
     mainWindow.loadURL(url);
   });
 
-  // IPC: renderer pede varredura — feita aqui no main process (Node.js real)
+  // IPC: renderer pede varredura â€” feita aqui no main process (Node.js real)
   ipcMain.removeAllListeners('client:varrer');
   ipcMain.handle('client:varrer', async () => {
     return await descobrirServidor();
@@ -1072,10 +1072,10 @@ input:focus{border-color:#7c3aed}
 </style></head><body>
 <div class="card">
   <h1>ASTIA PDV</h1>
-  <div class="sub">Cliente de caixa — conecte ao servidor da rede local</div>
+  <div class="sub">Cliente de caixa â€” conecte ao servidor da rede local</div>
 
   <button class="btn btn-scan" id="scanBtn" onclick="varrer()">
-    🔍 Detectar servidor automaticamente
+    ðŸ” Detectar servidor automaticamente
   </button>
   <div id="found" class="found"></div>
 
@@ -1093,7 +1093,7 @@ input:focus{border-color:#7c3aed}
     if (e.key === 'Enter') conectar();
   });
 
-  // Auto-varre ao abrir se não tiver IP salvo
+  // Auto-varre ao abrir se nÃ£o tiver IP salvo
   if (!document.getElementById('ip').value) {
     setTimeout(varrer, 400);
   }
@@ -1103,7 +1103,7 @@ input:focus{border-color:#7c3aed}
     const msg  = document.getElementById('msg');
     const list = document.getElementById('found');
     btn.disabled = true;
-    btn.textContent = '🔍 Varrendo rede...';
+    btn.textContent = 'ðŸ” Varrendo rede...';
     msg.className = 'msg info';
     msg.textContent = 'Procurando servidor ASTIA PDV na rede local...';
     list.innerHTML = '';
@@ -1112,23 +1112,23 @@ input:focus{border-color:#7c3aed}
     const ips = await window.vyn.varrerRede();
 
     btn.disabled = false;
-    btn.textContent = '🔍 Detectar servidor automaticamente';
+    btn.textContent = 'ðŸ” Detectar servidor automaticamente';
 
     if (!ips || ips.length === 0) {
       msg.className = 'msg err';
-      msg.textContent = 'Nenhum servidor encontrado. Verifique se o Servidor está ligado e na mesma rede Wi-Fi/cabo.';
+      msg.textContent = 'Nenhum servidor encontrado. Verifique se o Servidor estÃ¡ ligado e na mesma rede Wi-Fi/cabo.';
       return;
     }
 
     msg.className = 'msg ok';
     msg.textContent = ips.length === 1
-      ? '✅ Servidor encontrado!'
-      : ips.length + ' servidores encontrados — clique para conectar:';
+      ? 'âœ… Servidor encontrado!'
+      : ips.length + ' servidores encontrados â€” clique para conectar:';
 
     ips.forEach(ip => {
       const d = document.createElement('div');
       d.className = 'found-item';
-      d.textContent = '⚡ ' + ip + ':3567';
+      d.textContent = 'âš¡ ' + ip + ':3567';
       d.onclick = () => {
         document.getElementById('ip').value = ip;
         conectar();
@@ -1136,7 +1136,7 @@ input:focus{border-color:#7c3aed}
       list.appendChild(d);
     });
 
-    // Conecta automaticamente se achou só um
+    // Conecta automaticamente se achou sÃ³ um
     if (ips.length === 1) {
       document.getElementById('ip').value = ips[0];
       setTimeout(conectar, 700);
@@ -1158,7 +1158,7 @@ input:focus{border-color:#7c3aed}
     document.getElementById('msg').className = 'msg info';
     document.getElementById('msg').textContent = 'Conectando a ' + url + '...';
     document.getElementById('btnConn').disabled = true;
-    // IPC → processo principal faz o loadURL
+    // IPC â†’ processo principal faz o loadURL
     window.vyn.conectarServidor(url);
   }
 </script>
@@ -1180,7 +1180,7 @@ function createWindow(){
       sandbox: false,
       devTools: true,
       // Permite que o Electron carregue recursos de http://localhost:3567
-      // e que clientes na rede façam fetch para http://IP:3567 sem bloqueio CORS
+      // e que clientes na rede faÃ§am fetch para http://IP:3567 sem bloqueio CORS
       webSecurity: false,
       allowRunningInsecureContent: true,
     },
@@ -1192,7 +1192,7 @@ function createWindow(){
     if(isDev && process.env.OPEN_DEVTOOLS==='true') mainWindow.webContents.openDevTools();
   });
 
-  // Bloqueia DevTools em produção (Ctrl+Shift+I)
+  // Bloqueia DevTools em produÃ§Ã£o (Ctrl+Shift+I)
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if(!isDev && input.control && input.shift && input.key==='I') event.preventDefault();
   });
@@ -1202,17 +1202,17 @@ function createWindow(){
       // Modo cliente com servidor configurado
       mainWindow.loadURL(`http://${SERVER_HOST}:3567`);
     } else {
-      // Cliente sem servidor — mostra tela de configuração
+      // Cliente sem servidor â€” mostra tela de configuraÃ§Ã£o
       mostrarTelaConexao();
     }
   } else if(isDev){
     // Desenvolvimento: Vite dev server
     mainWindow.loadURL('http://localhost:5173');
   } else {
-    // Produção servidor: sempre via HTTP local (base '/' funciona corretamente)
+    // ProduÃ§Ã£o servidor: sempre via HTTP local (base '/' funciona corretamente)
     const distIndex = path.join(getDistPath(), 'index.html');
     if(!fs.existsSync(distIndex)){
-      // Build não encontrado — mostrar mensagem útil
+      // Build nÃ£o encontrado â€” mostrar mensagem Ãºtil
       mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(`
 <!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 body{font-family:system-ui,sans-serif;background:#0f172a;color:#f1f5f9;padding:40px;margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh}
@@ -1221,15 +1221,15 @@ h2{color:#f87171;margin-bottom:12px}code{background:#0f172a;padding:2px 6px;bord
 pre{background:#0f172a;padding:16px;border-radius:8px;margin-top:12px;font-size:13px;color:#94a3b8;line-height:1.6}
 p{color:#94a3b8;margin-bottom:8px}
 </style></head><body><div class="card">
-<h2>⚙️ Build não encontrado</h2>
-<p>O frontend ainda não foi compilado. Abra o terminal na pasta do projeto e execute:</p>
+<h2>âš™ï¸ Build nÃ£o encontrado</h2>
+<p>O frontend ainda nÃ£o foi compilado. Abra o terminal na pasta do projeto e execute:</p>
 <pre>npm install
 npm run rebuild
 npm run build:web
 npm start</pre>
 </div></body></html>`));
     } else {
-      // Aguarda o servidor HTTP iniciar antes de carregar (retry por até 10s)
+      // Aguarda o servidor HTTP iniciar antes de carregar (retry por atÃ© 10s)
       let tentativas = 0;
       const tryLoad = () => {
         tentativas++;
@@ -1247,7 +1247,7 @@ npm start</pre>
   mainWindow.on('closed', () => { mainWindow = null; });
 }
 
-// ── Menu ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildMenu(){
   const tpl = isDev ? [
     { label:'Dev', submenu:[{role:'reload'},{role:'forceReload'},{role:'toggleDevTools'},{type:'separator'},{label:'Backup DB',click:backupDB}] },
@@ -1267,9 +1267,9 @@ function showNetworkInfo(){
   const ip=getLocalIP(), dist=getDistPath();
   const ok=fs.existsSync(path.join(dist,'index.html'));
   const msg = IS_CLIENT
-    ? `CLIENTE\nServidor: ${SERVER_HOST||'não configurado'}:3567`
-    : `SERVIDOR\nIP local: ${ip}\nPorta: 3567\n\nOutros dispositivos acessam:\nhttp://${ip}:3567\n\nBuild: ${ok?'✅ OK':'❌ Pendente — rode npm run build:web'}`;
-  dialog.showMessageBox(mainWindow, {type:'info', title:'VYN CRM — Rede', message:'Informações da Rede', detail:msg});
+    ? `CLIENTE\nServidor: ${SERVER_HOST||'nÃ£o configurado'}:3567`
+    : `SERVIDOR\nIP local: ${ip}\nPorta: 3567\n\nOutros dispositivos acessam:\nhttp://${ip}:3567\n\nBuild: ${ok?'âœ… OK':'âŒ Pendente â€” rode npm run build:web'}`;
+  dialog.showMessageBox(mainWindow, {type:'info', title:'VYN CRM â€” Rede', message:'InformaÃ§Ãµes da Rede', detail:msg});
 }
 
 async function backupDB(){
@@ -1282,7 +1282,7 @@ async function backupDB(){
 }
 
 async function restoreDB(){
-  const c = await dialog.showMessageBox(mainWindow,{type:'warning',buttons:['Cancelar','Restaurar'],defaultId:0,message:'Restaurar backup?',detail:'Os dados atuais serão substituídos. Esta ação não pode ser desfeita.'});
+  const c = await dialog.showMessageBox(mainWindow,{type:'warning',buttons:['Cancelar','Restaurar'],defaultId:0,message:'Restaurar backup?',detail:'Os dados atuais serÃ£o substituÃ­dos. Esta aÃ§Ã£o nÃ£o pode ser desfeita.'});
   if(c.response!==1) return;
   const r = await dialog.showOpenDialog(mainWindow,{filters:[{name:'SQLite',extensions:['db']}],properties:['openFile']});
   if(!r.canceled){
@@ -1295,7 +1295,7 @@ async function restoreDB(){
   }
 }
 
-// ── IPC handlers ──────────────────────────────────────────────────────────────
+// â”€â”€ IPC handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function registerIPC(){
   // Chamada principal ao banco (servidor local via IPC)
   ipcMain.handle('ipc:call', (_, {channel, data}) => {
@@ -1313,7 +1313,7 @@ function registerIPC(){
 
   ipcMain.handle('license:activate', async (_, { licenseKey, serverUrl }) => {
     try {
-      if (!licenseManager) throw new Error('Licenciamento indisponível');
+      if (!licenseManager) throw new Error('Licenciamento indisponÃ­vel');
       const st = await licenseManager.activate({ licenseKey, serverUrl });
       return { ok: true, result: st };
     } catch (e) {
@@ -1323,7 +1323,7 @@ function registerIPC(){
 
   ipcMain.handle('license:verify', async () => {
     try {
-      if (!licenseManager) throw new Error('Licenciamento indisponível');
+      if (!licenseManager) throw new Error('Licenciamento indisponÃ­vel');
       const st = await licenseManager.verifyNow();
       return { ok: true, result: st };
     } catch (e) {
@@ -1335,7 +1335,7 @@ function registerIPC(){
     const r = await dialog.showOpenDialog({filters:[{name:'Imagem',extensions:['png','jpg','jpeg','webp']}],properties:['openFile']});
     return r.canceled ? null : r.filePaths[0];
   });
-  // ── Certificado Digital ──────────────────────────────────────────────────────
+  // â”€â”€ Certificado Digital â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ipcMain.handle('config:selecionar-certificado', async () => {
     const r = await dialog.showOpenDialog({
       title: 'Selecionar Certificado Digital A1',
@@ -1428,13 +1428,13 @@ function registerIPC(){
   ipcMain.handle('app:get-server-ip', () => getLocalIP());
   ipcMain.handle('app:get-mode', () => IS_CLIENT ? 'client' : 'server');
 
-  // ── Logo em base64 para uso no flyer ──────────────────────────────────────
+  // â”€â”€ Logo em base64 para uso no flyer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ipcMain.handle('app:logo-base64', async () => {
     try {
       const cfg = db?.configLoja?.get();
       if (!cfg?.logo_path) return null;
       const p = cfg.logo_path;
-      if (p.startsWith('data:')) return p; // já é base64
+      if (p.startsWith('data:')) return p; // jÃ¡ Ã© base64
       if (!fs.existsSync(p)) return null;
       const ext = path.extname(p).toLowerCase().replace('.', '');
       const mime = ext === 'png' ? 'image/png' : ext === 'svg' ? 'image/svg+xml' : 'image/jpeg';
@@ -1443,7 +1443,7 @@ function registerIPC(){
     } catch { return null; }
   });
 
-  // ── Tunnel Cloudflare ────────────────────────────────────────────────────
+  // â”€â”€ Tunnel Cloudflare â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ipcMain.handle('tunnel:start',  async () => { await startTunnel(); return { status: tunnelStatus, url: tunnelURL }; });
   ipcMain.handle('tunnel:stop',   () => { stopTunnel(); return { status: 'off' }; });
   ipcMain.handle('tunnel:status', () => ({ status: tunnelStatus, url: tunnelURL, log: tunnelLog.slice(-20) }));
@@ -1454,10 +1454,10 @@ function registerIPC(){
   ipcMain.handle('flyer:gerar-pdf', async (_, { html, nomeArquivo }) => {
     const tmpFile = path.join(app.getPath('temp'), `flyer_astia_${Date.now()}.html`);
     try {
-      // Salva HTML em arquivo temporário (mais confiável que data: URL)
+      // Salva HTML em arquivo temporÃ¡rio (mais confiÃ¡vel que data: URL)
       fs.writeFileSync(tmpFile, html, 'utf-8');
     } catch (e) {
-      return { ok: false, erro: 'Erro ao criar arquivo temporário: ' + e.message };
+      return { ok: false, erro: 'Erro ao criar arquivo temporÃ¡rio: ' + e.message };
     }
 
     return new Promise((resolve) => {
@@ -1512,7 +1512,7 @@ function registerIPC(){
         resolve({ ok: false, erro: `Falha ao carregar HTML: ${errDesc} (${errCode})` });
       });
 
-      // Timeout de segurança — 30s
+      // Timeout de seguranÃ§a â€” 30s
       setTimeout(() => {
         if (!flyerWin.isDestroyed()) {
           flyerWin.destroy();
@@ -1524,18 +1524,18 @@ function registerIPC(){
   });
 }
 
-// ── Auto-Updater ──────────────────────────────────────────────────────────────
+// â”€â”€ Auto-Updater â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function setupAutoUpdater() {
-  // Auto-updater desativado até configurar servidor de updates
+  // Auto-updater desativado atÃ© configurar servidor de updates
   // Para ativar: configure "publish" no electron-builder yml e descomente
   return;
   /*
   if (!autoUpdater || IS_CLIENT) return;
   try {
 
-  // Não checar em desenvolvimento
+  // NÃ£o checar em desenvolvimento
   if (isDev) {
-    console.log('[Updater] Modo dev — updates desativados');
+    console.log('[Updater] Modo dev â€” updates desativados');
     return;
   }
 
@@ -1545,12 +1545,12 @@ function setupAutoUpdater() {
 
   // Log de eventos
   autoUpdater.on('checking-for-update', () => {
-    console.log('[Updater] Verificando atualizações...');
+    console.log('[Updater] Verificando atualizaÃ§Ãµes...');
   });
 
   autoUpdater.on('update-available', (info) => {
-    console.log(`[Updater] Nova versão disponível: ${info.version}`);
-    // Notifica a janela que tem update disponível
+    console.log(`[Updater] Nova versÃ£o disponÃ­vel: ${info.version}`);
+    // Notifica a janela que tem update disponÃ­vel
     mainWindow?.webContents.send('update:disponivel', {
       versao: info.version,
       notas: info.releaseNotes || '',
@@ -1574,14 +1574,14 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    console.log(`[Updater] Versão ${info.version} baixada — instalando em 5 segundos...`);
+    console.log(`[Updater] VersÃ£o ${info.version} baixada â€” instalando em 5 segundos...`);
     // Notifica a janela (exibe aviso brevemente)
     mainWindow?.webContents.send('update:baixado', {
       versao: info.version,
       notas: info.releaseNotes || '',
     });
-    // Instala automaticamente após 5 segundos
-    // Dá tempo do usuário ver o aviso e salvar o que estiver fazendo
+    // Instala automaticamente apÃ³s 5 segundos
+    // DÃ¡ tempo do usuÃ¡rio ver o aviso e salvar o que estiver fazendo
     setTimeout(() => {
       autoUpdater.quitAndInstall(false, true);
     }, 5000);
@@ -1589,10 +1589,10 @@ function setupAutoUpdater() {
 
   autoUpdater.on('error', (err) => {
     console.error('[Updater] Erro:', err.message);
-    // Silencioso — não incomoda o cliente com erros de update
+    // Silencioso â€” nÃ£o incomoda o cliente com erros de update
   });
 
-  // Verifica ao iniciar (com delay para não impactar a abertura)
+  // Verifica ao iniciar (com delay para nÃ£o impactar a abertura)
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch(() => {});
   }, 8000);
@@ -1622,7 +1622,7 @@ ipcMain.handle('update:verificar', async () => {
   }
 });
 
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
+// â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 app.whenReady().then(() => {
   setupAutoUpdater();
   if(!IS_CLIENT){
@@ -1633,9 +1633,10 @@ app.whenReady().then(() => {
       licenseManager.init();
       startHTTPServer();
     } catch(err){
-      console.error('[VYN] Erro crítico:', err);
+      console.error('[VYN] Erro crÃ­tico:', err);
+      const detalhe = `${err.message || err}\n\n${err.stack || ''}`.trim();
       dialog.showErrorBox('Erro ao inicializar VYN CRM',
-        err.message + '\n\nVerifique se o Node.js e as dependências estão instalados:\nnpm install\nnpm run rebuild');
+        detalhe + '\n\nVerifique se o Node.js e as dependÃªncias estÃ£o instalados:\nnpm install\nnpm run rebuild');
     }
   }
   registerIPC();
@@ -1651,3 +1652,4 @@ app.on('quit', () => {
   licenseManager?.stop?.();
   try{ db?.getDB?.()?.close(); }catch{}
 });
+
