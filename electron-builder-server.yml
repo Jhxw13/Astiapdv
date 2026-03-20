@@ -47,3 +47,8 @@ linux:
 mac:
   target: dmg
   category: public.app-category.business
+
+publish:
+  provider: github
+  owner: Jhxw13
+  repo: Astiapdv

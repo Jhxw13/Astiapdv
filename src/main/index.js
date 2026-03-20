@@ -263,6 +263,12 @@ function handleDBCall(channel, data) {
     'financeiro:listar':          () => db.financeiro.listar(data),
     'financeiro:criar':           () => db.financeiro.criar(data),
     'financeiro:baixar':          () => db.financeiro.baixar(data.id, data.valor_pago, data.forma, data.data),
+    'fiados:listar':              () => db.financeiro.fiadosListar(data),
+    'fiados:criar':               () => db.financeiro.fiadosCriar(data),
+    'fiados:itens':               () => db.financeiro.fiadosItens(data),
+    'fiados:add-item':            () => db.financeiro.fiadosAdicionarItem(data),
+    'fiados:receber':             () => db.financeiro.fiadosReceber(data),
+    'fiados:lancar-venda':        () => db.financeiro.fiadosLancarVenda(data),
     'relatorios:curva-abc':       () => db.relatorios.curvaABC(data.inicio, data.fim),
     'relatorios:vendas-pdv':      () => db.relatorios.vendasPorPDV(data.inicio, data.fim),
     'relatorios:ranking-clientes':() => db.relatorios.rankingClientes(data.inicio, data.fim, data.limite),
@@ -1526,84 +1532,72 @@ function registerIPC(){
 
 // â”€â”€ Auto-Updater â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function setupAutoUpdater() {
-  // Auto-updater desativado atÃ© configurar servidor de updates
-  // Para ativar: configure "publish" no electron-builder yml e descomente
-  return;
-  /*
   if (!autoUpdater || IS_CLIENT) return;
-  try {
-
-  // NÃ£o checar em desenvolvimento
   if (isDev) {
-    console.log('[Updater] Modo dev â€” updates desativados');
+    console.log('[Updater] Modo dev - updates desativados');
     return;
   }
 
-  // Configura o updater
-  autoUpdater.autoDownload         = true;  // Baixa automaticamente
-  autoUpdater.autoInstallOnAppQuit = true;  // Instala ao fechar
+  try {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
 
-  // Log de eventos
-  autoUpdater.on('checking-for-update', () => {
-    console.log('[Updater] Verificando atualizaÃ§Ãµes...');
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    console.log(`[Updater] Nova versÃ£o disponÃ­vel: ${info.version}`);
-    // Notifica a janela que tem update disponÃ­vel
-    mainWindow?.webContents.send('update:disponivel', {
-      versao: info.version,
-      notas: info.releaseNotes || '',
+    autoUpdater.on('checking-for-update', () => {
+      console.log('[Updater] Verificando atualizacoes...');
     });
-  });
 
-  autoUpdater.on('update-not-available', () => {
-    console.log('[Updater] Sistema atualizado.');
-    mainWindow?.webContents.send('update:atualizado', {});
-  });
-
-  autoUpdater.on('download-progress', (progress) => {
-    const pct = Math.round(progress.percent);
-    console.log(`[Updater] Baixando: ${pct}%`);
-    mainWindow?.webContents.send('update:progresso', {
-      percent: pct,
-      bytesPerSecond: progress.bytesPerSecond,
-      transferred: progress.transferred,
-      total: progress.total,
+    autoUpdater.on('update-available', (info) => {
+      console.log(`[Updater] Nova versao disponivel: ${info.version}`);
+      mainWindow?.webContents.send('update:disponivel', {
+        versao: info.version,
+        notas: info.releaseNotes || '',
+      });
     });
-  });
 
-  autoUpdater.on('update-downloaded', (info) => {
-    console.log(`[Updater] VersÃ£o ${info.version} baixada â€” instalando em 5 segundos...`);
-    // Notifica a janela (exibe aviso brevemente)
-    mainWindow?.webContents.send('update:baixado', {
-      versao: info.version,
-      notas: info.releaseNotes || '',
+    autoUpdater.on('update-not-available', () => {
+      console.log('[Updater] Sistema atualizado.');
+      mainWindow?.webContents.send('update:atualizado', {});
     });
-    // Instala automaticamente apÃ³s 5 segundos
-    // DÃ¡ tempo do usuÃ¡rio ver o aviso e salvar o que estiver fazendo
+
+    autoUpdater.on('download-progress', (progress) => {
+      const pct = Math.round(progress.percent || 0);
+      mainWindow?.webContents.send('update:progresso', {
+        percent: pct,
+        bytesPerSecond: progress.bytesPerSecond,
+        transferred: progress.transferred,
+        total: progress.total,
+      });
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log(`[Updater] Versao ${info.version} baixada - instalando em 5 segundos...`);
+      mainWindow?.webContents.send('update:baixado', {
+        versao: info.version,
+        notas: info.releaseNotes || '',
+      });
+      setTimeout(() => {
+        autoUpdater.quitAndInstall(false, true);
+      }, 5000);
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.error('[Updater] Erro:', err?.message || err);
+    });
+
+    // Primeira verificacao ao iniciar
     setTimeout(() => {
-      autoUpdater.quitAndInstall(false, true);
-    }, 5000);
-  });
+      autoUpdater.checkForUpdates().catch((e) => {
+        console.log('[Updater] Falha na verificacao inicial:', e?.message || e);
+      });
+    }, 8000);
 
-  autoUpdater.on('error', (err) => {
-    console.error('[Updater] Erro:', err.message);
-    // Silencioso â€” nÃ£o incomoda o cliente com erros de update
-  });
-
-  // Verifica ao iniciar (com delay para nÃ£o impactar a abertura)
-  setTimeout(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 8000);
-
-  // Verifica a cada 4 horas
-  setInterval(() => {
-    autoUpdater.checkForUpdates().catch(() => {});
-  }, 4 * 60 * 60 * 1000);
-
-  } catch(e) { console.error('[Updater] Erro ao inicializar:', e.message); }
-  */
+    // Verifica periodicamente (a cada 4 horas)
+    setInterval(() => {
+      autoUpdater.checkForUpdates().catch(() => {});
+    }, 4 * 60 * 60 * 1000);
+  } catch (e) {
+    console.error('[Updater] Erro ao inicializar:', e?.message || e);
+  }
 }
 
 // IPC: cliente pede para instalar o update agora

@@ -36,3 +36,8 @@ nsis:
   shortcutName: ASTIA PDV Cliente
   language: 1046
   include: build/installer.nsh
+
+publish:
+  provider: github
+  owner: Jhxw13
+  repo: Astiapdv
