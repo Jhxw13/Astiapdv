@@ -32,10 +32,10 @@ jobs:
 
       - name: Build instalador Servidor
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --config electron-builder-server.yml --publish always
 
       - name: Build instalador Cliente
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --config electron-builder-client.yml --publish always
