@@ -475,13 +475,13 @@ export default function Products() {
           <div className="flex gap-2">
             <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
               <DialogTrigger asChild><Button variant="outline"><Tag className="w-4 h-4 mr-2" />Nova Categoria</Button></DialogTrigger>
-              <DialogContent><DialogHeader><DialogTitle>Nova Categoria</DialogTitle></DialogHeader>
+              <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-lg max-h-[92vh] overflow-y-auto p-4 sm:p-6"><DialogHeader><DialogTitle>Nova Categoria</DialogTitle></DialogHeader>
                 <CategoryForm onSave={handleSaveCategory} onCancel={() => setIsCategoryDialogOpen(false)} />
               </DialogContent>
             </Dialog>
             <Dialog open={isAddDialogOpen} onOpenChange={o => { setIsAddDialogOpen(o); if (!o) setEditingProduct(null); }}>
               <DialogTrigger asChild><Button className="btn-gradient"><Plus className="w-4 h-4 mr-2" />Novo Produto</Button></DialogTrigger>
-              <DialogContent className="max-w-2xl">
+              <DialogContent className="w-[calc(100vw-1rem)] sm:w-full max-w-2xl max-h-[92vh] overflow-y-auto p-4 sm:p-6">
                 <DialogHeader><DialogTitle>{editingProduct ? "Editar Produto" : "Novo Produto"}</DialogTitle><DialogDescription>Preencha os dados do produto</DialogDescription></DialogHeader>
                 <ProductForm produto={editingProduct} onSave={handleSaveProduct} onCancel={() => { setIsAddDialogOpen(false); setEditingProduct(null); }} />
               </DialogContent>

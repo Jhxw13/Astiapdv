@@ -202,6 +202,8 @@ function handleDBCall(channel, data) {
     'auth:login':                 () => db.auth.login(data.email, data.senha),
     'auth:trocar-senha':          () => db.auth.trocarSenha(data.usuario_id, data.senhaAtual, data.novaSenha),
     'auth:criar-usuario':         () => db.auth.criarUsuario(data),
+    'auth:primeiro-acesso-status':() => db.auth.primeiroAcessoStatus(),
+    'auth:primeiro-acesso-concluir': () => db.auth.concluirPrimeiroAcesso(data),
     'auth:listar-usuarios':       () => db.auth.listarUsuarios(),
     'auth:ativar-desativar':      () => db.auth.ativarDesativar(data.id, data.ativo),
     'config:get':                 () => db.configLoja.get(),
@@ -212,6 +214,7 @@ function handleDBCall(channel, data) {
     'categorias:deletar':         () => db.categorias.deletar(data),
     'produtos:listar':            () => db.produtos.listar(data),
     'produtos:buscar-codigo':     () => db.produtos.buscarPorCodigo(data),
+    'produtos:buscar-codigo-inteligente': () => db.produtos.buscarPorCodigoInteligente(data),
     'produtos:buscar-id':         () => db.produtos.buscarPorId(data),
     'produtos:criar':             () => db.produtos.criar(data),
     'produtos:atualizar':         () => db.produtos.atualizar(data.id, data),
@@ -329,6 +332,8 @@ function handleDBCall(channel, data) {
 function isLicenseFreeChannel(channel) {
   return [
     'auth:login',
+    'auth:primeiro-acesso-status',
+    'auth:primeiro-acesso-concluir',
     'config:get',
   ].includes(channel);
 }

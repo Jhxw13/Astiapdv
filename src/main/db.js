@@ -8,6 +8,8 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 
 let db = null;
+const DEFAULT_ADMIN_EMAIL = 'admin@vyncrm.com';
+const DEFAULT_ADMIN_PASSWORD = 'admin123';
 
 function initDB(dbPath) {
   const dir = path.dirname(dbPath);
@@ -31,20 +33,20 @@ function initDB(dbPath) {
 }
 
 function ensureAdmin() {
-  const existe = db.prepare('SELECT id FROM usuarios WHERE email = ?').get('admin@vyncrm.com');
+  const existe = db.prepare('SELECT id, senha_hash FROM usuarios WHERE email = ?').get(DEFAULT_ADMIN_EMAIL);
   if (!existe) {
     // Cria admin com hash correto
-    const hash = bcrypt.hashSync('admin123', 10);
+    const hash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
     db.prepare(`INSERT INTO usuarios (nome, email, senha_hash, cargo, ativo) VALUES (?, ?, ?, 'admin', 1)`)
-      .run('Administrador', 'admin@vyncrm.com', hash);
+      .run('Administrador', DEFAULT_ADMIN_EMAIL, hash);
     console.log('[DB] Admin criado: admin@vyncrm.com / admin123');
   } else {
     // Garante que o hash está correto (corrige hashes inválidos de versões anteriores)
-    const ok = bcrypt.compareSync('admin123', existe.senha_hash || '');
+    const ok = bcrypt.compareSync(DEFAULT_ADMIN_PASSWORD, existe.senha_hash || '');
     if (!ok) {
-      const hash = bcrypt.hashSync('admin123', 10);
+      const hash = bcrypt.hashSync(DEFAULT_ADMIN_PASSWORD, 10);
       db.prepare('UPDATE usuarios SET senha_hash = ?, ativo = 1 WHERE email = ?')
-        .run(hash, 'admin@vyncrm.com');
+        .run(hash, DEFAULT_ADMIN_EMAIL);
       console.log('[DB] Hash do admin corrigido.');
     }
   }
@@ -112,6 +114,7 @@ function runMigrations() {
   safeAddColumn('config_loja', 'license_customer_name', 'TEXT');
   safeAddColumn('config_loja', 'license_server_url', 'TEXT');
   safeAddColumn('config_loja', 'license_notes', 'TEXT');
+  safeAddColumn('config_loja', 'onboarding_primeiro_acesso_concluido', 'INTEGER DEFAULT 0');
   // Garante início do trial para bases antigas
   getDB().prepare(`
     UPDATE config_loja
@@ -283,6 +286,55 @@ const auth = {
       INSERT INTO usuarios (nome, email, senha_hash, cargo) VALUES (?, ?, ?, ?)
     `).run(data.nome, data.email, hash, data.cargo || 'vendedor');
   },
+  primeiroAcessoStatus: () => {
+    const cfg = configLoja.get() || {};
+    const concluidoFlag = Number(cfg.onboarding_primeiro_acesso_concluido || 0) === 1;
+    const usuariosCustom = getDB().prepare(`
+      SELECT COUNT(*) as total
+      FROM usuarios
+      WHERE ativo = 1 AND lower(email) != lower(?)
+    `).get(DEFAULT_ADMIN_EMAIL)?.total || 0;
+    const required = !concluidoFlag && usuariosCustom === 0;
+    return {
+      required,
+      completed: !required,
+      hasCustomUsers: usuariosCustom > 0,
+      defaultAdminEmail: DEFAULT_ADMIN_EMAIL,
+    };
+  },
+  concluirPrimeiroAcesso: (data) => {
+    const nome = String(data?.nome || '').trim();
+    const email = String(data?.email || '').trim().toLowerCase();
+    const senha = String(data?.senha || '').trim();
+
+    if (!nome || nome.length < 3) throw new Error('Informe um nome com pelo menos 3 caracteres');
+    if (!email || !email.includes('@')) throw new Error('Informe um e-mail válido');
+    if (!senha || senha.length < 6) throw new Error('A senha precisa ter pelo menos 6 caracteres');
+
+    const st = auth.primeiroAcessoStatus();
+    if (!st.required) {
+      throw new Error('Primeiro acesso já foi concluído nesta instalação');
+    }
+
+    const existeEmail = getDB().prepare('SELECT id FROM usuarios WHERE lower(email) = lower(?)').get(email);
+    if (existeEmail) throw new Error('Já existe um usuário com este e-mail');
+
+    const hash = bcrypt.hashSync(senha, 10);
+    const tx = getDB().transaction(() => {
+      getDB().prepare(`
+        INSERT INTO usuarios (nome, email, senha_hash, cargo, ativo)
+        VALUES (?, ?, ?, 'admin', 1)
+      `).run(nome, email, hash);
+      getDB().prepare(`
+        UPDATE usuarios
+        SET ativo = 0
+        WHERE lower(email) = lower(?)
+      `).run(DEFAULT_ADMIN_EMAIL);
+      configLoja.update({ onboarding_primeiro_acesso_concluido: 1 });
+    });
+    tx();
+    return { ok: true };
+  },
   listarUsuarios: () => getDB().prepare(`SELECT id,nome,email,cargo,ativo,criado_em FROM usuarios ORDER BY nome`).all(),
   ativarDesativar: (id, ativo) => getDB().prepare('UPDATE usuarios SET ativo = ? WHERE id = ?').run(ativo, id),
 };
@@ -299,7 +351,8 @@ const configLoja = {
       'ambiente_nfe','pdv_tamanho_fonte','pdv_impressora','pdv_largura_papel','chave_licenca','plano',
       'focus_api_key','focus_nfe_habilitado','serie_nfe','serie_nfce','ultimo_numero_nfe','ultimo_numero_nfce',
       'validade_licenca','license_status','license_activated_at','license_last_check','license_offline_grace_until',
-      'license_trial_started_at','license_device_id','license_customer_name','license_server_url','license_notes'];
+      'license_trial_started_at','license_device_id','license_customer_name','license_server_url','license_notes',
+      'onboarding_primeiro_acesso_concluido'];
     const campos = Object.keys(data).filter(k => permitidos.includes(k));
     if (!campos.length) return;
     const sets = campos.map(k => `${k} = @${k}`).join(', ');
@@ -372,6 +425,78 @@ const produtos = {
     FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id
     WHERE p.codigo_barras = ? OR p.sku = ? LIMIT 1
   `).get(codigo, codigo),
+
+  // Busca inteligente para leitor de código:
+  // - código direto (EAN/SKU)
+  // - etiqueta de balança (13 dígitos iniciando com 2)
+  buscarPorCodigoInteligente: (codigoLido) => {
+    const codigo = String(codigoLido || '').trim();
+    if (!codigo) return null;
+
+    // 1) Busca direta (código de barras ou SKU)
+    const direto = getDB().prepare(`
+      SELECT p.*, c.nome as categoria_nome,
+        CASE WHEN p.preco_custo > 0 THEN ROUND(((p.preco_venda-p.preco_custo)/p.preco_custo)*100,2) ELSE 0 END as margem_lucro
+      FROM produtos p LEFT JOIN categorias c ON p.categoria_id = c.id
+      WHERE (p.codigo_barras = ? OR p.sku = ?) AND p.ativo = 1
+      LIMIT 1
+    `).get(codigo, codigo);
+    if (direto) {
+      return {
+        produto: direto,
+        quantidade: 1,
+        total: Number(direto.preco_venda || 0),
+        origem: 'direto',
+      };
+    }
+
+    // 2) Etiqueta de balança (padrão comum BR): 2 + PLU + VALOR + DV
+    // Exemplos suportados:
+    // - 1 + 5 + 5 + 1  => prefixo(2) + plu5 + valor_cent + dv
+    // - 1 + 6 + 5 + 1  => prefixo(2) + plu6 + valor_cent + dv
+    if (!/^\d{13}$/.test(codigo) || !codigo.startsWith('2')) return null;
+
+    const plu5 = codigo.slice(1, 6);
+    const valor5 = codigo.slice(6, 11);
+    const plu6 = codigo.slice(1, 7);
+    const valor6 = codigo.slice(7, 12);
+
+    const candidatos = getDB().prepare(`
+      SELECT p.*, c.nome as categoria_nome,
+        CASE WHEN p.preco_custo > 0 THEN ROUND(((p.preco_venda-p.preco_custo)/p.preco_custo)*100,2) ELSE 0 END as margem_lucro
+      FROM produtos p
+      LEFT JOIN categorias c ON p.categoria_id = c.id
+      WHERE p.ativo = 1
+        AND (
+          p.sku = @plu5 OR p.sku = @plu6 OR
+          p.codigo_barras = @plu5 OR p.codigo_barras = @plu6
+        )
+      LIMIT 1
+    `).get({ plu5, plu6 });
+
+    if (!candidatos) return null;
+
+    // Primeiro tenta valor no formato de PLU-5, depois PLU-6.
+    const valorCent5 = Number(valor5);
+    const valorCent6 = Number(valor6);
+    const valorCent = Number.isFinite(valorCent5) && valorCent5 > 0 ? valorCent5 : valorCent6;
+    const totalEtiqueta = Number((valorCent / 100).toFixed(2));
+
+    let quantidade = 1;
+    const precoVenda = Number(candidatos.preco_venda || 0);
+    if (precoVenda > 0) {
+      quantidade = Number((totalEtiqueta / precoVenda).toFixed(3));
+      if (quantidade <= 0) quantidade = 1;
+    }
+
+    return {
+      produto: candidatos,
+      quantidade,
+      total: totalEtiqueta > 0 ? totalEtiqueta : Number(candidatos.preco_venda || 0),
+      origem: 'balanca',
+      codigo_lido: codigo,
+    };
+  },
 
   buscarPorId: (id) => getDB().prepare(`
     SELECT p.*, c.nome as categoria_nome,
@@ -945,6 +1070,7 @@ module.exports = {
   produtos, estoque,
   clientes, caixa, vendas, pedidos,
   conferencia, relatorios, financeiro,
+  licenseStore,
 };
 
 // Patch: adicionar funções de relatório avançado e despesas mensais

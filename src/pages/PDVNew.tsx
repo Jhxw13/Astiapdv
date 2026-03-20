@@ -984,25 +984,31 @@ export default function PDVNew() {
     }
   };
 
-  const addToCart = useCallback((produto: any) => {
+  const addToCart = useCallback((produto: any, opts?: { quantidade?: number; total?: number }) => {
+    const quantidadeEntrada = Number(opts?.quantidade || 1);
+    const totalEntrada = Number(opts?.total || 0);
+    const quantidadeFinal = Number.isFinite(quantidadeEntrada) && quantidadeEntrada > 0 ? quantidadeEntrada : 1;
+    const precoCalculado = Number(produto.preco_venda || 0);
+    const totalCalculado = totalEntrada > 0 ? totalEntrada : (precoCalculado * quantidadeFinal);
+
     if (produto.estoque_atual <= 0) {
       toast({ title: "Sem estoque", description: produto.nome, variant: "destructive" }); return;
     }
     setCart(prev => {
       const ex = prev.find(i => i.id === produto.id);
       if (ex) {
-        if (ex.quantidade >= produto.estoque_atual) {
+        if ((ex.quantidade + quantidadeFinal) > produto.estoque_atual) {
           toast({ title: "Estoque insuficiente", variant: "destructive" }); return prev;
         }
         return prev.map(i => i.id === produto.id
-          ? { ...i, quantidade: i.quantidade + 1, total: i.preco * (i.quantidade + 1) }
+          ? { ...i, quantidade: Number((i.quantidade + quantidadeFinal).toFixed(3)), total: Number((i.total + totalCalculado).toFixed(2)) }
           : i);
       }
       return [...prev, {
         id: produto.id, nome: produto.nome,
-        preco: produto.preco_venda, preco_custo: produto.preco_custo || 0,
-        quantidade: 1, estoque: produto.estoque_atual,
-        codigo_barras: produto.codigo_barras, total: produto.preco_venda,
+        preco: precoCalculado, preco_custo: produto.preco_custo || 0,
+        quantidade: Number(quantidadeFinal.toFixed(3)), estoque: produto.estoque_atual,
+        codigo_barras: produto.codigo_barras, total: Number(totalCalculado.toFixed(2)),
       }];
     });
   }, [toast]);
@@ -1018,9 +1024,16 @@ export default function PDVNew() {
 
   const buscarPorCodigo = async (codigo: string) => {
     try {
-      const p = await produtosAPI.buscarPorCodigo(codigo);
-      if (p) {
-        addToCart(p); setScanStatus("found");
+      const res = await produtosAPI.buscarPorCodigoInteligente(codigo);
+      if (res?.produto) {
+        addToCart(res.produto, { quantidade: res.quantidade, total: res.total });
+        if (res.origem === "balanca") {
+          toast({
+            title: "Etiqueta de balança lida",
+            description: `${res.produto.nome} • ${Number(res.quantidade || 0).toFixed(3)} ${res.produto.unidade_medida || "UN"} • R$ ${Number(res.total || 0).toFixed(2)}`,
+          });
+        }
+        setScanStatus("found");
         setTimeout(() => setScanStatus("idle"), 1000);
       } else {
         setScanStatus("notfound");

@@ -120,6 +120,9 @@ export const authAPI = {
   trocarSenha: (usuario_id: number, senhaAtual: string, novaSenha: string) =>
     invoke('auth:trocar-senha', { usuario_id, senhaAtual, novaSenha }),
   criarUsuario: (data: any) => invoke('auth:criar-usuario', data),
+  primeiroAcessoStatus: () => invoke('auth:primeiro-acesso-status'),
+  concluirPrimeiroAcesso: (data: { nome: string; email: string; senha: string }) =>
+    invoke('auth:primeiro-acesso-concluir', data),
   listarUsuarios: () => invoke('auth:listar-usuarios'),
   ativarDesativar: (id: number, ativo: number) => invoke('auth:ativar-desativar', { id, ativo }),
 };
@@ -146,6 +149,7 @@ export const categoriasAPI = {
 export const produtosAPI = {
   listar: (f?: any) => invoke('produtos:listar', f),
   buscarPorCodigo: (codigo: string) => invoke('produtos:buscar-codigo', codigo),
+  buscarPorCodigoInteligente: (codigo: string) => invoke('produtos:buscar-codigo-inteligente', codigo),
   buscarPorId: (id: number) => invoke('produtos:buscar-id', id),
   criar: (d: any) => invoke('produtos:criar', d),
   atualizar: (id: number, d: any) => invoke('produtos:atualizar', { id, ...d }),
