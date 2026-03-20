@@ -1249,8 +1249,17 @@ function GptMakerTab({ configLoja }: { configLoja: any }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [gptUrl, setGptUrl] = useState("");
   const [iframeKey, setIframeKey] = useState(0);
+  const [savingIA, setSavingIA] = useState(false);
   const [tunnel, setTunnel] = useState<{ status: string; url: string | null; log: string[] }>({
     status: 'off', url: null, log: []
+  });
+  const [iaConfig, setIaConfig] = useState({
+    status: 'inativo',
+    plano: 'addon',
+    trialStartedAt: '',
+    trialEndsAt: '',
+    numero: '',
+    gptUrl: '',
   });
   const [downloading, setDownloading] = useState(false);
   const { toast } = useToast();
@@ -1263,6 +1272,20 @@ function GptMakerTab({ configLoja }: { configLoja: any }) {
     const unsub = vyn?.on?.('tunnel:status', (s: any) => { if (s) setTunnel(s); });
     return () => { unsub?.(); };
   }, []);
+
+  useEffect(() => {
+    setIaConfig({
+      status: String(configLoja?.ia_whatsapp_status || 'inativo'),
+      plano: String(configLoja?.ia_whatsapp_plano || 'addon'),
+      trialStartedAt: String(configLoja?.ia_whatsapp_trial_started_at || ''),
+      trialEndsAt: String(configLoja?.ia_whatsapp_trial_ends_at || ''),
+      numero: String(configLoja?.ia_whatsapp_numero || ''),
+      gptUrl: String(configLoja?.ia_whatsapp_gpt_url || ''),
+    });
+    if (configLoja?.ia_whatsapp_gpt_url && !gptUrl) {
+      setGptUrl(String(configLoja.ia_whatsapp_gpt_url));
+    }
+  }, [configLoja]);
 
   const iniciarTunnel = async () => {
     setTunnel(t => ({ ...t, status: 'starting', log: [...t.log, 'Iniciando...'] }));
@@ -1307,6 +1330,51 @@ function GptMakerTab({ configLoja }: { configLoja: any }) {
 
   const apiBase = tunnel.url || `http://${window.location.hostname}:3567/api`;
   const nomeLoja = configLoja?.nome || "Minha Loja";
+  const trialEndsDate = iaConfig.trialEndsAt ? new Date(iaConfig.trialEndsAt) : null;
+  const trialAtivo = !!(trialEndsDate && trialEndsDate.getTime() >= Date.now());
+  const diasTrial = trialEndsDate ? Math.max(0, Math.ceil((trialEndsDate.getTime() - Date.now()) / 86400000)) : 0;
+
+  const salvarIA = async (next: Partial<typeof iaConfig>) => {
+    const merged = { ...iaConfig, ...next };
+    setSavingIA(true);
+    try {
+      await configAPI.update({
+        ia_whatsapp_status: merged.status,
+        ia_whatsapp_plano: merged.plano,
+        ia_whatsapp_trial_started_at: merged.trialStartedAt || null,
+        ia_whatsapp_trial_ends_at: merged.trialEndsAt || null,
+        ia_whatsapp_numero: merged.numero || null,
+        ia_whatsapp_gpt_url: merged.gptUrl || null,
+      });
+      setIaConfig(merged);
+      toast({ title: "Configuração da IA salva" });
+    } catch (e: any) {
+      toast({ title: "Erro ao salvar IA WhatsApp", description: e.message, variant: "destructive" });
+    } finally {
+      setSavingIA(false);
+    }
+  };
+
+  const ativarTrial7Dias = async () => {
+    const now = new Date();
+    const end = new Date(now);
+    end.setDate(end.getDate() + 7);
+    await salvarIA({
+      status: 'trial',
+      plano: 'addon',
+      trialStartedAt: now.toISOString(),
+      trialEndsAt: end.toISOString(),
+      gptUrl: gptUrl || iaConfig.gptUrl,
+    });
+  };
+
+  const ativarPlanoPago = async () => {
+    await salvarIA({
+      status: 'ativo',
+      plano: 'addon',
+      gptUrl: gptUrl || iaConfig.gptUrl,
+    });
+  };
 
   const promptBase = `Você é o assistente de IA do ${nomeLoja}, um sistema de PDV (Ponto de Venda).
 Você tem acesso à API do ASTIA PDV em tempo real via webhooks.
@@ -1347,6 +1415,59 @@ Quando perguntarem sobre produtos, preços, vendas ou estoque, consulte a API an
           </p>
         </div>
       </div>
+
+      {/* Oferta comercial IA */}
+      <Card className="border-2 border-violet-300 dark:border-violet-700">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm flex items-center justify-between">
+            <span className="flex items-center gap-2"><Sparkles className="w-4 h-4 text-violet-500" />Oferta IA WhatsApp para o cliente</span>
+            <Badge className={trialAtivo ? "bg-amber-500 text-white" : iaConfig.status === 'ativo' ? "bg-green-600 text-white" : "bg-muted text-foreground"}>
+              {trialAtivo ? `TRIAL (${diasTrial} dias)` : iaConfig.status === 'ativo' ? "ATIVO" : "INATIVO"}
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            Venda como add-on: <strong>R$ 150/mês</strong>. Você pode liberar <strong>7 dias grátis</strong> por número.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <Label>Número do WhatsApp do cliente</Label>
+              <Input
+                placeholder="Ex: 5511999999999"
+                value={iaConfig.numero}
+                onChange={(e) => setIaConfig(prev => ({ ...prev, numero: e.target.value }))}
+              />
+            </div>
+            <div>
+              <Label>URL do painel GPT Maker (opcional)</Label>
+              <Input
+                placeholder="https://app.gptmaker.ai/..."
+                value={iaConfig.gptUrl}
+                onChange={(e) => setIaConfig(prev => ({ ...prev, gptUrl: e.target.value }))}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={ativarTrial7Dias} disabled={savingIA} className="bg-violet-600 hover:bg-violet-700">
+              Liberar trial 7 dias
+            </Button>
+            <Button variant="outline" onClick={ativarPlanoPago} disabled={savingIA}>
+              Marcar como plano pago (R$150/mês)
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => salvarIA({ status: 'inativo', trialStartedAt: '', trialEndsAt: '' })}
+              disabled={savingIA}
+            >
+              Desativar add-on
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Sugestão comercial: manter o add-on em R$150/mês e usar o trial para fechar a venda após validação do cliente.
+          </p>
+        </CardContent>
+      </Card>
 
       {/* ── PAINEL DO TÚNEL ── */}
       <Card className={`border-2 ${tunnel.status === 'active' ? 'border-green-400 dark:border-green-700' : tunnel.status === 'starting' ? 'border-yellow-400' : tunnel.status === 'error' ? 'border-red-400' : 'border-border'}`}>
@@ -1475,6 +1596,7 @@ Quando perguntarem sobre produtos, preços, vendas ou estoque, consulte a API an
           <div className="flex gap-2">
             <Input placeholder="https://app.gptmaker.ai/..." value={gptUrl} onChange={e => setGptUrl(e.target.value)} />
             {gptUrl && <Button variant="outline" size="icon" onClick={() => setIframeKey(k => k + 1)}><RefreshCw className="w-4 h-4" /></Button>}
+            {gptUrl && <Button variant="outline" onClick={() => salvarIA({ gptUrl })} disabled={savingIA}>Salvar URL</Button>}
           </div>
           {gptUrl ? (
             <div className="rounded-xl overflow-hidden border" style={{ height: 600 }}>

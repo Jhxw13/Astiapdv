@@ -134,6 +134,13 @@ function runMigrations() {
   safeAddColumn('config_loja', 'ecommerce_tempo_entrega','TEXT');
   safeAddColumn('config_loja', 'ecommerce_whatsapp',     'TEXT');
   safeAddColumn('config_loja', 'ecommerce_ultimo_sync',  'TEXT');
+  // IA WhatsApp (GPT Maker)
+  safeAddColumn('config_loja', 'ia_whatsapp_status', "TEXT DEFAULT 'inativo'");
+  safeAddColumn('config_loja', 'ia_whatsapp_plano', "TEXT DEFAULT 'addon'");
+  safeAddColumn('config_loja', 'ia_whatsapp_trial_started_at', 'TEXT');
+  safeAddColumn('config_loja', 'ia_whatsapp_trial_ends_at', 'TEXT');
+  safeAddColumn('config_loja', 'ia_whatsapp_numero', 'TEXT');
+  safeAddColumn('config_loja', 'ia_whatsapp_gpt_url', 'TEXT');
   // Marcar produto para loja online
   safeAddColumn('produtos', 'online_ativo',   'INTEGER DEFAULT 0');
   safeAddColumn('produtos', 'online_descricao','TEXT');
@@ -352,7 +359,9 @@ const configLoja = {
       'focus_api_key','focus_nfe_habilitado','serie_nfe','serie_nfce','ultimo_numero_nfe','ultimo_numero_nfce',
       'validade_licenca','license_status','license_activated_at','license_last_check','license_offline_grace_until',
       'license_trial_started_at','license_device_id','license_customer_name','license_server_url','license_notes',
-      'onboarding_primeiro_acesso_concluido'];
+      'onboarding_primeiro_acesso_concluido',
+      'ia_whatsapp_status','ia_whatsapp_plano','ia_whatsapp_trial_started_at','ia_whatsapp_trial_ends_at',
+      'ia_whatsapp_numero','ia_whatsapp_gpt_url'];
     const campos = Object.keys(data).filter(k => permitidos.includes(k));
     if (!campos.length) return;
     const sets = campos.map(k => `${k} = @${k}`).join(', ');
