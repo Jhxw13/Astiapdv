@@ -1,0 +1,19 @@
+<svg viewBox="0 0 400 120" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <defs>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="30%" stop-color="#c8c8c8"/>
+      <stop offset="60%" stop-color="#e8e8e8"/>
+      <stop offset="100%" stop-color="#888888"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <text x="50%" y="82" text-anchor="middle"
+    font-family="'Helvetica Neue',Arial,sans-serif"
+    font-size="88" font-weight="900"
+    letter-spacing="12"
+    fill="url(#metal)"
+    filter="url(#shadow)">ASTIA</text>
+</svg>

@@ -1,0 +1,26 @@
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Icon</title></head>
+<body>
+<canvas id="c" width="512" height="512"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+// Background - dark
+ctx.fillStyle = '#0a0a0a';
+ctx.fillRect(0,0,512,512);
+// Gradient text
+const g = ctx.createLinearGradient(0,180,0,340);
+g.addColorStop(0,'#ffffff');
+g.addColorStop(0.4,'#c8c8c8');
+g.addColorStop(0.7,'#e0e0e0');
+g.addColorStop(1,'#888888');
+ctx.fillStyle = g;
+ctx.font = 'bold 148px "Helvetica Neue",Arial,sans-serif';
+ctx.letterSpacing = '8px';
+ctx.textAlign = 'center';
+ctx.textBaseline = 'middle';
+ctx.shadowColor = 'rgba(0,0,0,0.8)';
+ctx.shadowBlur = 12;
+ctx.fillText('ASTIA', 256, 256);
+document.body.append(c.toDataURL());
+</script>
+</body></html>

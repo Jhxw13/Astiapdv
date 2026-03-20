@@ -1,0 +1,49 @@
+appId: com.vyndeveloper.astiapdv.servidor
+productName: ASTIA PDV Servidor
+copyright: ASTIA PDV
+
+directories:
+  output: release/servidor
+  buildResources: public
+
+files:
+  - dist/**/*
+  - src/main/**/*
+  - package.json
+  - node_modules/**/*
+  - "!node_modules/.cache/**"
+  - "!**/{test,tests,__tests__,spec}/**"
+  - "!**/*.{md,ts,map}"
+
+extraMetadata:
+  main: src/main/index.js
+
+asar: true
+asarUnpack:
+  - node_modules/better-sqlite3/**/*
+  - node_modules/bcryptjs/**/*
+  - dist/**/*
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: public/icon.png
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ASTIA PDV Servidor
+  language: 1046
+  runAfterFinish: true
+  include: build/installer.nsh
+
+linux:
+  target: AppImage
+  category: Office
+
+mac:
+  target: dmg
+  category: public.app-category.business

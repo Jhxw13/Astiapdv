@@ -1,0 +1,243 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Professional CRM Design System - Modern Business Interface */
+
+@layer base {
+  :root {
+    /* Core Business Colors */
+    --background: 0 0% 100%;
+    --foreground: 220 13% 13%;
+    
+    /* Cards & Surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 8%;
+    --card-hover: 240 10% 98%;
+    
+    /* Primary Brand Colors - Professional Blue */
+    --primary: 217 91% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 217 91% 55%;
+    --primary-light: 217 91% 85%;
+    
+    /* Secondary - Professional Purple */
+    --secondary: 262 83% 58%;
+    --secondary-foreground: 0 0% 100%;
+    --secondary-hover: 262 83% 53%;
+    --secondary-light: 262 83% 85%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(262 83% 58%));
+    --gradient-secondary: linear-gradient(135deg, hsl(217 91% 85%), hsl(262 83% 85%));
+    --gradient-background: linear-gradient(135deg, hsl(220 30% 98%), hsl(240 30% 96%));
+    
+    /* Status Colors */
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Neutral Grays */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 30%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 217 91% 60%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 13% 5%;
+    
+    /* Glassmorphism */
+    --glass-background: 0 0% 100% / 0.8;
+    --glass-border: 220 13% 91% / 0.3;
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 10px -3px hsl(220 13% 13% / 0.1);
+    --shadow-medium: 0 4px 20px -4px hsl(220 13% 13% / 0.15);
+    --shadow-strong: 0 8px 30px -8px hsl(220 13% 13% / 0.2);
+    --shadow-glow: 0 0 20px -5px hsl(217 91% 60% / 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 5%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 12%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Core Business Colors - Dark Mode */
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+    
+    /* Cards & Surfaces */
+    --card: 224 71% 4%;
+    --card-foreground: 213 31% 91%;
+    --card-hover: 215 25% 8%;
+    
+    /* Primary Brand Colors - Adjusted for dark */
+    --primary: 217 91% 65%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+    --primary-hover: 217 91% 60%;
+    --primary-light: 217 91% 25%;
+    
+    /* Secondary - Adjusted for dark */
+    --secondary: 262 83% 63%;
+    --secondary-foreground: 210 40% 2%;
+    --secondary-hover: 262 83% 58%;
+    --secondary-light: 262 83% 25%;
+    
+    /* Status Colors - Dark Mode */
+    --success: 142 76% 41%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* Neutral Grays - Dark Mode */
+    --muted: 215 28% 17%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --border: 215 28% 17%;
+    --input: 215 28% 17%;
+    --ring: 217 91% 65%;
+    --accent: 215 28% 17%;
+    --accent-foreground: 210 40% 98%;
+    
+    /* Glassmorphism - Dark Mode */
+    --glass-background: 224 71% 4% / 0.8;
+    --glass-border: 215 28% 17% / 0.3;
+    
+    /* Gradients - Dark Mode */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 65%), hsl(262 83% 63%));
+    --gradient-secondary: linear-gradient(135deg, hsl(217 91% 25%), hsl(262 83% 25%));
+    --gradient-background: linear-gradient(135deg, hsl(224 71% 4%), hsl(215 25% 8%));
+    
+    /* Shadows - Dark Mode */
+    --shadow-soft: 0 2px 10px -3px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 20px -4px hsl(0 0% 0% / 0.4);
+    --shadow-strong: 0 8px 30px -8px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 20px -5px hsl(217 91% 65% / 0.4);
+
+    /* Popover/Dialog surfaces - Dark Mode */
+    --popover: 222 47% 11%;
+    --popover-foreground: 213 31% 91%;
+
+    /* Sidebar - Dark Mode */
+    --sidebar-background: 224 71% 4%;
+    --sidebar-foreground: 213 31% 91%;
+    --sidebar-primary: 217 91% 65%;
+    --sidebar-primary-foreground: 222.2 47.4% 1.2%;
+    --sidebar-accent: 215 28% 17%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 215 28% 17%;
+    --sidebar-ring: 217 91% 65%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+}
+
+@layer components {
+  /* Glass Card Effect */
+  .glass-card {
+    @apply backdrop-blur-sm border-white/20;
+    background: hsl(var(--glass-background));
+    border: 1px solid hsl(var(--glass-border));
+    box-shadow: var(--shadow-soft);
+  }
+
+  /* Gradient Backgrounds */
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+
+  .gradient-secondary {
+    background: var(--gradient-secondary);
+  }
+
+  .gradient-background {
+    background: var(--gradient-background);
+  }
+
+  /* Custom Shadows */
+  .shadow-soft {
+    box-shadow: var(--shadow-soft);
+  }
+
+  .shadow-medium {
+    box-shadow: var(--shadow-medium);
+  }
+
+  .shadow-strong {
+    box-shadow: var(--shadow-strong);
+  }
+
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  /* Smooth Transitions */
+  .transition-smooth {
+    transition: var(--transition-smooth);
+  }
+
+  .transition-spring {
+    transition: var(--transition-spring);
+  }
+
+  /* Hover Effects */
+  .hover-lift {
+    @apply transition-smooth;
+  }
+
+  .hover-lift:hover {
+    @apply -translate-y-1 shadow-medium;
+  }
+
+  /* Custom Button Variants */
+  .btn-gradient {
+    @apply gradient-primary text-white font-semibold px-6 py-3 rounded-lg transition-smooth;
+  }
+
+  .btn-gradient:hover {
+    @apply shadow-glow scale-105;
+  }
+
+  .btn-glass {
+    @apply glass-card text-primary font-semibold px-6 py-3 rounded-lg transition-smooth;
+  }
+
+  .btn-glass:hover {
+    @apply bg-primary/10 shadow-medium;
+  }
+}

@@ -1,0 +1,41 @@
+name: Build & Release ASTIA PDV
+
+on:
+  push:
+    tags:
+      - 'v*'          # Dispara quando você criar uma tag como v1.0.1, v1.2.0
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Instalar dependências
+        run: npm install
+
+      - name: Recompilar módulos nativos (better-sqlite3)
+        run: npm run rebuild
+
+      - name: Baixar VC++ Redistributable
+        run: node scripts/download-vcredist.js
+
+      - name: Build frontend (React)
+        run: npm run build:web
+
+      - name: Build instalador Servidor
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx electron-builder --config electron-builder-server.yml --publish always
+
+      - name: Build instalador Cliente
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: npx electron-builder --config electron-builder-client.yml --publish always
